@@ -307,7 +307,7 @@ export default function ProjectDetail() {
         cancelText="Cancel"
         isDangerous={true}
         requiresTyping={true}
-        typingPrompt={project?.code || '}
+        typingPrompt={project?.code || ''}
         onConfirm={handleDeleteProject}
         onCancel={() => setDeleteConfirm(false)}
         isLoading={deleting}
