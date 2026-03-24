@@ -4,6 +4,7 @@ import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
+import ConfirmDialog from '../components/ConfirmDialog';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -25,6 +26,8 @@ export default function ProjectDetail() {
   const [reimbursing, setReimbursing] = useState(null);
   const [reimburseFrom, setReimburseFrom] = useState('university');
   const [error, setError] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
     try {
@@ -45,6 +48,17 @@ export default function ProjectDetail() {
     if (!confirm('Delete this expense? This cannot be undone.')) return;
     try { await api.delete(`/expenses/${expId}`); load(); }
     catch(e) { alert(e.response?.data?.error || 'Could not delete.'); }
+  };
+
+  const handleDeleteProject = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/projects/${id}`);
+      navigate('/');
+    } catch(e) {
+      setError(e.response?.data?.error || 'Failed to delete project.');
+      setDeleting(false);
+    }
   };
 
   const handleMarkInst = async iid => {
@@ -89,6 +103,9 @@ export default function ProjectDetail() {
           <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export CSV</button>
           <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
           <button className="btn btn-primary" onClick={() => setShowExpModal(true)}>+ Add Expense</button>
+          {isAdmin && (
+            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete Project</button>
+          )}
         </div>
       </div>
 
@@ -282,6 +299,19 @@ export default function ProjectDetail() {
 
       {showExpModal && <ExpenseModal projectId={id} onClose={() => setShowExpModal(false)} onSaved={() => { setShowExpModal(false); load(); }} />}
       {showInstModal && <InstallmentModal projectId={id} onClose={() => setShowInstModal(false)} onSaved={() => { setShowInstModal(false); load(); }} />}
+      <ConfirmDialog
+        isOpen={deleteConfirm}
+        title="Delete Project"
+        message={`Are you sure you want to delete project "${project?.code}"? This will also delete all associated expenses and cannot be undone.`}
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDangerous={true}
+        requiresTyping={true}
+        typingPrompt={project?.code || '}
+        onConfirm={handleDeleteProject}
+        onCancel={() => setDeleteConfirm(false)}
+        isLoading={deleting}
+      />
     </>
   );
 }
