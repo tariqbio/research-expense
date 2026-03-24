@@ -50,13 +50,13 @@ export default function ProjectModal({ onClose, onSaved }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" style={{ maxWidth: 580 }}>
-        <div className="modal-header">
+        <div className="modal-head">
           <h3>New Research Project</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">{error}</div>}
+            {error && <div className="notice notice-error">{error}</div>}
 
             <div className="form-row">
               <div className="form-group">
@@ -110,9 +110,9 @@ export default function ProjectModal({ onClose, onSaved }) {
                     <label key={m.id} style={{
                       display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
                       padding: '5px 10px', border: '1px solid',
-                      borderColor: form.member_ids.includes(m.id) ? 'var(--accent)' : 'var(--border-2)',
-                      borderRadius: 'var(--radius)', fontSize: 13,
-                      background: form.member_ids.includes(m.id) ? 'var(--accent-2)' : 'var(--surface)',
+                      borderColor: form.member_ids.includes(m.id) ? 'var(--accent)' : 'var(--border-strong)',
+                      borderRadius: 'var(--r)', fontSize: 13,
+                      background: form.member_ids.includes(m.id) ? 'var(--accent-light)' : 'var(--bg-surface)',
                     }}>
                       <input type="checkbox" checked={form.member_ids.includes(m.id)}
                         onChange={() => toggleMember(m.id)} style={{ cursor: 'pointer' }} />
@@ -124,8 +124,8 @@ export default function ProjectModal({ onClose, onSaved }) {
               </div>
             )}
           </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Creating…' : 'Create Project'}
             </button>

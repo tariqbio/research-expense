@@ -5,6 +5,9 @@ import { useAuth } from '../context/AuthContext';
 import ProjectModal from '../components/ProjectModal';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
+const now = new Date();
+const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+const greet = () => { const h = now.getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
 export default function Dashboard() {
   const { isAdmin, user } = useAuth();
@@ -17,8 +20,7 @@ export default function Dashboard() {
     try {
       const [pRes, sRes] = await Promise.all([api.get('/projects'), api.get('/expenses/summary')]);
       setProjects(pRes.data); setSummary(sRes.data);
-    } catch (err) { console.error(err); }
-    finally { setLoading(false); }
+    } catch(e) { console.error(e); } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
 
@@ -30,86 +32,130 @@ export default function Dashboard() {
   }), { budget:0, spent:0, reimbursed:0, pending:0 });
 
   const pct = totals.budget > 0 ? Math.min(100, (totals.spent / totals.budget) * 100) : 0;
-  const greet = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
   if (loading) return (
     <div className="loading-screen">
       <div className="spinner" />
-      <div className="loading-text">LOADING DASHBOARD...</div>
+      <div className="loading-label">Loading your dashboard…</div>
     </div>
   );
 
   return (
     <>
       <div className="page-header">
-        <div>
-          <h2>{greet()}, {user?.name?.split(' ')[0]} 👋</h2>
-          <div className="page-sub">{new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} · {projects.length} active project{projects.length !== 1 ? 's' : ''}</div>
+        <div className="page-header-left">
+          <div className="page-eyebrow">Research Finance</div>
+          <h1 className="page-title">{greet()}, {user?.name?.split(' ')[0]} 👋</h1>
+          <p className="page-subtitle">{dateStr} · {projects.length} project{projects.length !== 1 ? 's' : ''} in your portfolio</p>
         </div>
-        {isAdmin && <button className="btn btn-primary" onClick={() => setShowModal(true)}>＋ New Project</button>}
+        {isAdmin && (
+          <div className="no-print">
+            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+              + New Project
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="page-body">
-        <div className="stat-grid">
+        {/* Stats */}
+        <div className="stats-grid">
           <div className="stat-card">
-            <div className="stat-icon-wrap si-blue">💰</div>
-            <div className="stat-label">Total Budget</div>
-            <div className="stat-value sv-blue">{fmt(totals.budget)}</div>
-            <div className="stat-sub">across {projects.length} project{projects.length !== 1 ? 's' : ''}</div>
+            <div className="stat-top">
+              <div>
+                <div className="stat-label">Total Budget</div>
+                <div className="stat-value indigo">{fmt(totals.budget)}</div>
+              </div>
+              <div className="stat-icon si-indigo">💰</div>
+            </div>
+            <div className="stat-note">{projects.length} project{projects.length !== 1 ? 's' : ''} total</div>
           </div>
+
           <div className="stat-card">
-            <div className="stat-icon-wrap si-purple">📈</div>
-            <div className="stat-label">Total Spent</div>
-            <div className="stat-value">{fmt(totals.spent)}</div>
-            <div className="progress-bar"><div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} /></div>
-            <div className="stat-sub">{pct.toFixed(1)}% of total budget</div>
+            <div className="stat-top">
+              <div>
+                <div className="stat-label">Total Spent</div>
+                <div className="stat-value">{fmt(totals.spent)}</div>
+              </div>
+              <div className="stat-icon si-blue">📈</div>
+            </div>
+            <div className="progress">
+              <div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} />
+            </div>
+            <div className="stat-note">{pct.toFixed(1)}% of total budget utilised</div>
           </div>
+
           <div className="stat-card">
-            <div className="stat-icon-wrap si-green">✅</div>
-            <div className="stat-label">Reimbursed</div>
-            <div className="stat-value sv-green">{fmt(totals.reimbursed)}</div>
-            <div className="stat-sub">paid back to researchers</div>
+            <div className="stat-top">
+              <div>
+                <div className="stat-label">Reimbursed</div>
+                <div className="stat-value green">{fmt(totals.reimbursed)}</div>
+              </div>
+              <div className="stat-icon si-green">✅</div>
+            </div>
+            <div className="stat-note">Returned to researchers</div>
           </div>
+
           <div className="stat-card">
-            <div className="stat-icon-wrap si-orange">⏳</div>
-            <div className="stat-label">Pending</div>
-            <div className="stat-value sv-orange">{fmt(totals.pending)}</div>
-            <div className="stat-sub">outstanding reimbursements</div>
+            <div className="stat-top">
+              <div>
+                <div className="stat-label">Pending</div>
+                <div className="stat-value amber">{fmt(totals.pending)}</div>
+              </div>
+              <div className="stat-icon si-amber">⏳</div>
+            </div>
+            <div className="stat-note">Awaiting reimbursement</div>
           </div>
         </div>
 
-        <div className="section-hdr">
-          <div className="section-title">📁 Research Projects</div>
-          {isAdmin && <button className="btn btn-secondary btn-sm" onClick={() => setShowModal(true)}>＋ New</button>}
+        {/* Projects section */}
+        <div className="section-header">
+          <div>
+            <div className="section-title">Research Projects</div>
+            <div className="section-subtitle">{projects.length} project{projects.length !== 1 ? 's' : ''} · click any to view details</div>
+          </div>
+          {isAdmin && (
+            <button className="btn btn-outline btn-sm no-print" onClick={() => setShowModal(true)}>
+              + New Project
+            </button>
+          )}
         </div>
 
         {projects.length === 0 ? (
           <div className="empty-state">
-            <span className="empty-icon">🗂️</span>
-            <p>No projects yet. Create your first research project to begin tracking expenses.</p>
-            {isAdmin && <button className="btn btn-primary" onClick={() => setShowModal(true)}>＋ Create First Project</button>}
+            <div className="empty-icon">🗂️</div>
+            <h4>No projects yet</h4>
+            <p>Create your first research project to start tracking expenses and managing your budget.</p>
+            {isAdmin && <button className="btn btn-primary" onClick={() => setShowModal(true)}>Create First Project</button>}
           </div>
         ) : (
-          <div className="project-grid">
+          <div className="projects-grid">
             {projects.map((p, i) => {
               const s = summary.find(s => s.project_id === p.id) || {};
-              const spent = Number(s.total_spent || 0), budget = Number(p.total_budget || 0);
+              const spent = Number(s.total_spent || 0);
+              const budget = Number(p.total_budget || 0);
               const spentPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
               return (
                 <Link key={p.id} to={`/projects/${p.id}`} className="project-card" style={{ animationDelay: (i * 0.06) + 's' }}>
-                  <div className="project-code-tag">🔬 {p.code}</div>
-                  <div className="project-name">{p.name}</div>
-                  <div className="project-meta">
-                    <span className={`badge ${p.status === 'active' ? 'badge-green' : p.status === 'completed' ? 'badge-blue' : 'badge-gray'}`}>{p.status}</span>
-                    <span className="badge badge-purple">{p.payment_type}</span>
+                  <div className="project-card-top">
+                    <span className="project-code">{p.code}</span>
+                    <span className={`badge ${p.status === 'active' ? 'badge-green' : p.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
+                      {p.status}
+                    </span>
                   </div>
-                  <div className="progress-bar"><div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} /></div>
-                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 5, fontFamily: 'var(--mono)' }}>{spentPct.toFixed(1)}% of budget used</div>
+                  <div className="project-title">{p.name}</div>
+                  <div className="project-tags">
+                    <span className="badge badge-indigo">{p.payment_type}</span>
+                  </div>
+                  <div className="progress" style={{ margin: '4px 0 6px' }}>
+                    <div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% of budget used</div>
                   <div className="project-stats">
-                    <div><div className="ps-label">Budget</div><div className="ps-val">{fmt(budget)}</div></div>
-                    <div><div className="ps-label">Spent</div><div className="ps-val">{fmt(spent)}</div></div>
-                    <div><div className="ps-label">Reimbursed</div><div className="ps-val" style={{ color: 'var(--green)' }}>{fmt(s.reimbursed || 0)}</div></div>
-                    <div><div className="ps-label">Pending</div><div className="ps-val" style={{ color: 'var(--orange)' }}>{fmt(s.pending || 0)}</div></div>
+                    <div><div className="ps-label">Budget</div><div className="ps-value">{fmt(budget)}</div></div>
+                    <div><div className="ps-label">Spent</div><div className="ps-value">{fmt(spent)}</div></div>
+                    <div><div className="ps-label">Reimbursed</div><div className="ps-value green">{fmt(s.reimbursed || 0)}</div></div>
+                    <div><div className="ps-label">Pending</div><div className="ps-value amber">{fmt(s.pending || 0)}</div></div>
                   </div>
                 </Link>
               );

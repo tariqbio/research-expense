@@ -52,13 +52,13 @@ export default function ExpenseModal({ projectId, onClose, onSaved }) {
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
-        <div className="modal-header">
+        <div className="modal-head">
           <h3>Add Expense</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">{error}</div>}
+            {error && <div className="notice notice-error">{error}</div>}
 
             {!projectId && (
               <div className="form-group">
@@ -104,8 +104,8 @@ export default function ExpenseModal({ projectId, onClose, onSaved }) {
               </div>
             </div>
           </div>
-          <div className="modal-footer">
-            <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+          <div className="modal-foot">
+            <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               {saving ? 'Saving…' : 'Submit Expense'}
             </button>
