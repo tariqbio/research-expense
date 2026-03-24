@@ -186,7 +186,7 @@ export default function Expenses() {
                   <tr>
                     <th>Date</th>
                     <th>Project</th>
-                    {isAdmin && <th>Submitted By</th>}
+                    <th>Submitted By</th>
                     <th>Category</th>
                     <th>Description</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
@@ -203,12 +203,10 @@ export default function Expenses() {
                         <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
                         <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.project_name}</div>
                       </td>
-                      {isAdmin && (
-                        <td>
+                      <td>
                           <div style={{ fontWeight: 600, fontSize: 13 }}>{e.submitted_by_name}</div>
                           {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid {fmtDate(e.reimbursed_at)}</div>}
                         </td>
-                      )}
                       <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{CAT_LABELS[e.category]}</span></td>
                       <td style={{ maxWidth: 220 }}>
                         <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
@@ -228,7 +226,7 @@ export default function Expenses() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={isAdmin ? 5 : 4} style={{ color: 'var(--text-secondary)' }}>Total · {expenses.length} records</td>
+                    <td colSpan={isAdmin ? 5 : 5} style={{ color: 'var(--text-secondary)' }}>Total · {expenses.length} records</td>
                     <td className="td-amount">{fmt(totals.total)}</td>
                     <td colSpan={isAdmin ? 3 : 2}>
                       <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(totals.reimbursed)}</span>

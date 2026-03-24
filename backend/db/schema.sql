@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- ============================================================
 INSERT INTO users (name, email, password, role)
 VALUES (
-  'FGS Admin',
+  'Tariq',
   'admin@fgs.diu.edu',
   '$2b$10$0l1bqXWDrj/duFYGI2hLF.t4HAd.OYe/aVyHGUm/HHHPrAynLxqGy', -- Admin@1234
   'admin'

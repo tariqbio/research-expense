@@ -237,6 +237,9 @@ body {
 .topbar-breadcrumb .current { color: var(--text-primary); font-weight: 600; }
 .topbar-sep { color: var(--text-tertiary); }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
+.topbar-clock { display: flex; align-items: center; gap: 10px; padding: 4px 12px; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 8px; }
+.topbar-date { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+.topbar-time { font-size: 12px; color: var(--text-primary); font-weight: 600; letter-spacing: 0.3px; }
 
 .theme-toggle {
   width: 34px; height: 34px; border-radius: var(--r);

@@ -5,9 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import ProjectModal from '../components/ProjectModal';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
-const now = new Date();
-const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-const greet = () => { const h = now.getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+const getGreeting = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
 
 export default function Dashboard() {
   const { isAdmin, user } = useAuth();
@@ -15,6 +13,15 @@ export default function Dashboard() {
   const [summary, setSummary]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [now, setNow]             = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const dateStr = now.toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
   const load = async () => {
     try {
@@ -45,8 +52,8 @@ export default function Dashboard() {
       <div className="page-header">
         <div className="page-header-left">
           <div className="page-eyebrow">Research Finance</div>
-          <h1 className="page-title">{greet()}, {user?.name?.split(' ')[0]} 👋</h1>
-          <p className="page-subtitle">{dateStr} · {projects.length} project{projects.length !== 1 ? 's' : ''} in your portfolio</p>
+          <h1 className="page-title">{getGreeting()}, {user?.name?.split(' ')[0]} 👋</h1>
+          <p className="page-subtitle">{dateStr} · <span style={{ fontVariantNumeric: 'tabular-nums' }}>🕐 {timeStr}</span> · {projects.length} project{projects.length !== 1 ? 's' : ''} in your portfolio</p>
         </div>
         {isAdmin && (
           <div className="no-print">

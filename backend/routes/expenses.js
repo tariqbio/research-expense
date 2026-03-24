@@ -15,11 +15,8 @@ router.get('/', authenticate, async (req, res) => {
     let params = [];
     let idx = 1;
 
-    // Members can only see their own expenses
+    // Members can see ALL expenses in their projects (not just their own)
     if (req.user.role !== 'admin') {
-      conditions.push(`e.submitted_by = $${idx++}`);
-      params.push(req.user.id);
-      // Also restrict to their projects
       conditions.push(`e.project_id IN (
         SELECT project_id FROM project_members WHERE user_id = $${idx++}
       )`);
@@ -30,7 +27,7 @@ router.get('/', authenticate, async (req, res) => {
     }
 
     if (project_id) { conditions.push(`e.project_id = $${idx++}`); params.push(project_id); }
-    if (reimbursed !== undefined) { conditions.push(`e.reimbursed = $${idx++}`); params.push(reimbursed === 'true'); }
+    if (reimbursed !== undefined && reimbursed !== '') { conditions.push(`e.reimbursed = $${idx++}`); params.push(reimbursed === 'true'); }
     if (category) { conditions.push(`e.category = $${idx++}`); params.push(category); }
     if (from_date) { conditions.push(`e.expense_date >= $${idx++}`); params.push(from_date); }
     if (to_date) { conditions.push(`e.expense_date <= $${idx++}`); params.push(to_date); }
@@ -63,14 +60,26 @@ router.get('/', authenticate, async (req, res) => {
 // GET /api/expenses/summary — aggregated stats per project
 router.get('/summary', authenticate, async (req, res) => {
   try {
-    let projectFilter = '';
-    let params = [];
-
     if (req.user.role !== 'admin') {
-      projectFilter = `AND e.project_id IN (
-        SELECT project_id FROM project_members WHERE user_id = $1
-      )`;
-      params.push(req.user.id);
+      const { rows } = await pool.query(
+        `SELECT
+          p.id AS project_id,
+          p.code,
+          p.name AS project_name,
+          p.total_budget,
+          COALESCE(SUM(e.amount), 0) AS total_spent,
+          COALESCE(SUM(CASE WHEN e.reimbursed THEN e.amount ELSE 0 END), 0) AS reimbursed,
+          COALESCE(SUM(CASE WHEN NOT e.reimbursed THEN e.amount ELSE 0 END), 0) AS pending,
+          COUNT(e.id) AS expense_count,
+          COUNT(CASE WHEN NOT e.reimbursed THEN 1 END) AS pending_count
+         FROM projects p
+         JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+         LEFT JOIN expenses e ON e.project_id = p.id
+         GROUP BY p.id
+         ORDER BY p.code`,
+        [req.user.id]
+      );
+      return res.json(rows);
     }
 
     const { rows } = await pool.query(
@@ -85,11 +94,9 @@ router.get('/summary', authenticate, async (req, res) => {
         COUNT(e.id) AS expense_count,
         COUNT(CASE WHEN NOT e.reimbursed THEN 1 END) AS pending_count
        FROM projects p
-       LEFT JOIN expenses e ON e.project_id = p.id ${projectFilter}
-       ${req.user.role !== 'admin' ? 'JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1' : ''}
+       LEFT JOIN expenses e ON e.project_id = p.id
        GROUP BY p.id
-       ORDER BY p.code`,
-      params
+       ORDER BY p.code`
     );
     res.json(rows);
   } catch (err) {
