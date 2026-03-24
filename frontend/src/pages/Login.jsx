@@ -17,7 +17,7 @@ export default function Login() {
       await login(form.email, form.password);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Check credentials.');
+      setError(err.response?.data?.error || 'Login failed. Check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -25,40 +25,52 @@ export default function Login() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
-        <div className="login-header">
+      <div className="login-wrapper">
+        <div className="login-brand">
+          <div className="login-brand-mark">🎓</div>
           <h1>Research Expense Tracker</h1>
-          <p>Faculty of Graduate Studies · DIU</p>
+          <p>Faculty of Graduate Studies · Daffodil International University</p>
         </div>
-        <form className="login-body" onSubmit={handleSubmit}>
+
+        <div className="login-card">
           {error && <div className="alert alert-error">{error}</div>}
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input
-              type="email"
-              className="form-input"
-              placeholder="you@diu.edu"
-              value={form.email}
-              onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-              required
-              autoFocus
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input
-              type="password"
-              className="form-input"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-              required
-            />
-          </div>
-          <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={loading}>
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-        </form>
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Email Address</label>
+              <input
+                type="email"
+                className="form-input"
+                placeholder="you@diu.edu.bd"
+                value={form.email}
+                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                required autoFocus
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 24 }}>
+              <label className="form-label">Password</label>
+              <input
+                type="password"
+                className="form-input"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                required
+              />
+            </div>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: 14 }}
+              disabled={loading}
+            >
+              {loading ? '⏳ Signing in…' : '→ Sign In'}
+            </button>
+          </form>
+        </div>
+
+        <div className="login-footer">
+          Authorized personnel only · All access is logged
+        </div>
       </div>
     </div>
   );
