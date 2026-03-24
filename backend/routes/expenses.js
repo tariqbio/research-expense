@@ -267,4 +267,86 @@ router.get('/audit/:id', authenticate, adminOnly, async (req, res) => {
   }
 });
 
+// PATCH /api/expenses/bulk/reimburse — admin bulk marks expenses as reimbursed
+router.patch('/bulk/reimburse', authenticate, adminOnly, async (req, res) => {
+  const { expense_ids, reimbursed_from } = req.body;
+  if (!Array.isArray(expense_ids) || !reimbursed_from) {
+    return res.status(400).json({ error: 'expense_ids array and reimbursed_from required' });
+  }
+  try {
+    const placeholders = expense_ids.map((_, i) => `$${i + 1}`).join(',');
+    await pool.query(
+      `UPDATE expenses SET reimbursed = true, reimbursed_by = $${expense_ids.length + 1}, reimbursed_from = $${expense_ids.length + 2}, reimbursed_at = NOW() WHERE id IN (${placeholders})`,
+      [...expense_ids, req.user.id, reimbursed_from]
+    );
+    // Log each update
+    for (const eid of expense_ids) {
+      await pool.query(
+        `INSERT INTO audit_log (table_name, record_id, action, changed_by, new_value, changed_at)
+         VALUES ('expenses', $1, 'bulk_reimbursed', $2, $3, NOW())`,
+        [eid, req.user.id, JSON.stringify({ reimbursed: true, reimbursed_from })]
+      );
+    }
+    res.json({ message: `Marked ${expense_ids.length} expenses as reimbursed` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/expenses/bulk — admin bulk deletes expenses
+router.delete('/bulk', authenticate, adminOnly, async (req, res) => {
+  const { expense_ids } = req.body;
+  if (!Array.isArray(expense_ids)) {
+    return res.status(400).json({ error: 'expense_ids array required' });
+  }
+  try {
+    const placeholders = expense_ids.map((_, i) => `$${i + 1}`).join(',');
+    // Only delete if not reimbursed
+    await pool.query(
+      `DELETE FROM expenses WHERE id IN (${placeholders}) AND reimbursed = false`,
+      expense_ids
+    );
+    // Log each deletion
+    for (const eid of expense_ids) {
+      await pool.query(
+        `INSERT INTO audit_log (table_name, record_id, action, changed_by, changed_at)
+         VALUES ('expenses', $1, 'bulk_deleted', $2, NOW())`,
+        [eid, req.user.id]
+      );
+    }
+    res.json({ message: `Deleted ${expense_ids.length} expenses` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/expenses/bulk/category — admin bulk updates expense category
+router.patch('/bulk/category', authenticate, adminOnly, async (req, res) => {
+  const { expense_ids, category } = req.body;
+  if (!Array.isArray(expense_ids) || !category) {
+    return res.status(400).json({ error: 'expense_ids array and category required' });
+  }
+  try {
+    const placeholders = expense_ids.map((_, i) => `$${i + 1}`).join(',');
+    await pool.query(
+      `UPDATE expenses SET category = $${expense_ids.length + 1} WHERE id IN (${placeholders})`,
+      [...expense_ids, category]
+    );
+    // Log each update
+    for (const eid of expense_ids) {
+      await pool.query(
+        `INSERT INTO audit_log (table_name, record_id, action, changed_by, new_value, changed_at)
+         VALUES ('expenses', $1, 'bulk_category_update', $2, $3, NOW())`,
+        [eid, req.user.id, JSON.stringify({ category })]
+      );
+    }
+    res.json({ message: `Updated ${expense_ids.length} expenses` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
