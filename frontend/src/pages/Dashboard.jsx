@@ -213,13 +213,21 @@ export default function Dashboard() {
               const budget = Number(p.total_budget || 0);
               const spentPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
               return (
-                <div key={p.id} style={{ position: 'relative' }}>
-                  <Link to={`/projects/${p.id}`} className="project-card" style={{ animationDelay: (i * 0.06) + 's', display: 'block' }}>
+                <Link key={p.id} to={`/projects/${p.id}`} className="project-card" style={{ animationDelay: (i * 0.06) + 's', display: 'block' }}>
                     <div className="project-card-top">
                       <span className="project-code">{p.code}</span>
-                      <span className={`badge ${p.status === 'active' ? 'badge-green' : p.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
-                        {p.status === 'completed' ? 'Ended' : p.status}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className={`badge ${p.status === 'active' ? 'badge-green' : p.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
+                          {p.status === 'completed' ? 'Ended' : p.status}
+                        </span>
+                        {isAdmin && (
+                          <button
+                            className="btn btn-ghost btn-xs no-print"
+                            style={{ color: 'var(--accent)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
+                          >✏</button>
+                        )}
+                      </div>
                     </div>
                     <div className="project-title">{p.name}</div>
                     <div className="project-tags">
@@ -236,14 +244,6 @@ export default function Dashboard() {
                       <div><div className="ps-label">Pending</div><div className="ps-value amber">{fmt(s.pending || 0)}</div></div>
                     </div>
                   </Link>
-                  {isAdmin && (
-                    <button
-                      className="btn btn-ghost btn-xs no-print"
-                      style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, color: 'var(--accent)', fontSize: 11, padding: '3px 8px' }}
-                      onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
-                    >✏ Edit</button>
-                  )}
-                </div>
               );
             })}
           </div>
