@@ -13,7 +13,11 @@ export default function Dashboard() {
   const [summary, setSummary]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editProject, setEditProject] = useState(null);
   const [now, setNow]             = useState(new Date());
+  const [search, setSearch]       = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [sortBy, setSortBy]       = useState('newest');
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -40,6 +44,27 @@ export default function Dashboard() {
 
   const pct = totals.budget > 0 ? Math.min(100, (totals.spent / totals.budget) * 100) : 0;
 
+  // Filter + sort
+  let filtered = projects.filter(p => {
+    const q = search.toLowerCase();
+    const matchQ = !q || p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
+    const matchS = !statusFilter || p.status === statusFilter;
+    return matchQ && matchS;
+  });
+  filtered = [...filtered].sort((a, b) => {
+    if (sortBy === 'newest')  return new Date(b.created_at) - new Date(a.created_at);
+    if (sortBy === 'oldest')  return new Date(a.created_at) - new Date(b.created_at);
+    if (sortBy === 'name')    return a.name.localeCompare(b.name);
+    if (sortBy === 'code')    return a.code.localeCompare(b.code);
+    if (sortBy === 'budget')  return Number(b.total_budget) - Number(a.total_budget);
+    if (sortBy === 'spent') {
+      const sa = summary.find(s => s.project_id === a.id);
+      const sb = summary.find(s => s.project_id === b.id);
+      return Number(sb?.total_spent||0) - Number(sa?.total_spent||0);
+    }
+    return 0;
+  });
+
   if (loading) return (
     <div className="loading-screen">
       <div className="spinner" />
@@ -57,7 +82,7 @@ export default function Dashboard() {
         </div>
         {isAdmin && (
           <div className="no-print">
-            <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+            <button className="btn btn-primary" onClick={() => { setEditProject(null); setShowModal(true); }}>
               + New Project
             </button>
           </div>
@@ -119,16 +144,61 @@ export default function Dashboard() {
         <div className="section-header">
           <div>
             <div className="section-title">Research Projects</div>
-            <div className="section-subtitle">{projects.length} project{projects.length !== 1 ? 's' : ''} · click any to view details</div>
+            <div className="section-subtitle">{filtered.length} of {projects.length} project{projects.length !== 1 ? 's' : ''} · click any to view details</div>
           </div>
           {isAdmin && (
-            <button className="btn btn-outline btn-sm no-print" onClick={() => setShowModal(true)}>
+            <button className="btn btn-outline btn-sm no-print" onClick={() => { setEditProject(null); setShowModal(true); }}>
               + New Project
             </button>
           )}
         </div>
 
-        {projects.length === 0 ? (
+        {/* Search + Filter bar */}
+        {projects.length > 0 && (
+          <div className="card no-print" style={{ marginBottom: 20 }}>
+            <div className="filter-bar" style={{ padding: '14px 18px' }}>
+              <div className="filter-field" style={{ flex: 2 }}>
+                <label className="form-label">Search</label>
+                <input className="form-input" placeholder="Search by name, code, or description…"
+                  value={search} onChange={e => setSearch(e.target.value)} />
+              </div>
+              <div className="filter-field">
+                <label className="form-label">Status</label>
+                <select className="form-select" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+                  <option value="">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed / Ended</option>
+                  <option value="on_hold">On Hold</option>
+                </select>
+              </div>
+              <div className="filter-field">
+                <label className="form-label">Sort By</label>
+                <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                  <option value="name">Name A–Z</option>
+                  <option value="code">Code A–Z</option>
+                  <option value="budget">Highest budget</option>
+                  <option value="spent">Most spent</option>
+                </select>
+              </div>
+              {(search || statusFilter) && (
+                <div className="filter-field" style={{ alignSelf: 'flex-end' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>✕ Clear</button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {filtered.length === 0 && projects.length > 0 ? (
+          <div className="empty-state">
+            <div className="empty-icon">🔍</div>
+            <h4>No projects match</h4>
+            <p>Try adjusting your search or filter.</p>
+            <button className="btn btn-outline btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>Clear filters</button>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🗂️</div>
             <h4>No projects yet</h4>
@@ -137,41 +207,56 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="projects-grid">
-            {projects.map((p, i) => {
+            {filtered.map((p, i) => {
               const s = summary.find(s => s.project_id === p.id) || {};
               const spent = Number(s.total_spent || 0);
               const budget = Number(p.total_budget || 0);
               const spentPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
               return (
-                <Link key={p.id} to={`/projects/${p.id}`} className="project-card" style={{ animationDelay: (i * 0.06) + 's' }}>
-                  <div className="project-card-top">
-                    <span className="project-code">{p.code}</span>
-                    <span className={`badge ${p.status === 'active' ? 'badge-green' : p.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
-                      {p.status}
-                    </span>
-                  </div>
-                  <div className="project-title">{p.name}</div>
-                  <div className="project-tags">
-                    <span className="badge badge-indigo">{p.payment_type}</span>
-                  </div>
-                  <div className="progress" style={{ margin: '4px 0 6px' }}>
-                    <div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} />
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% of budget used</div>
-                  <div className="project-stats">
-                    <div><div className="ps-label">Budget</div><div className="ps-value">{fmt(budget)}</div></div>
-                    <div><div className="ps-label">Spent</div><div className="ps-value">{fmt(spent)}</div></div>
-                    <div><div className="ps-label">Reimbursed</div><div className="ps-value green">{fmt(s.reimbursed || 0)}</div></div>
-                    <div><div className="ps-label">Pending</div><div className="ps-value amber">{fmt(s.pending || 0)}</div></div>
-                  </div>
-                </Link>
+                <div key={p.id} style={{ position: 'relative' }}>
+                  <Link to={`/projects/${p.id}`} className="project-card" style={{ animationDelay: (i * 0.06) + 's', display: 'block' }}>
+                    <div className="project-card-top">
+                      <span className="project-code">{p.code}</span>
+                      <span className={`badge ${p.status === 'active' ? 'badge-green' : p.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
+                        {p.status === 'completed' ? 'Ended' : p.status}
+                      </span>
+                    </div>
+                    <div className="project-title">{p.name}</div>
+                    <div className="project-tags">
+                      <span className="badge badge-indigo">{p.payment_type}</span>
+                    </div>
+                    <div className="progress" style={{ margin: '4px 0 6px' }}>
+                      <div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% of budget used</div>
+                    <div className="project-stats">
+                      <div><div className="ps-label">Budget</div><div className="ps-value">{fmt(budget)}</div></div>
+                      <div><div className="ps-label">Spent</div><div className="ps-value">{fmt(spent)}</div></div>
+                      <div><div className="ps-label">Reimbursed</div><div className="ps-value green">{fmt(s.reimbursed || 0)}</div></div>
+                      <div><div className="ps-label">Pending</div><div className="ps-value amber">{fmt(s.pending || 0)}</div></div>
+                    </div>
+                  </Link>
+                  {isAdmin && (
+                    <button
+                      className="btn btn-ghost btn-xs no-print"
+                      style={{ position: 'absolute', top: 10, right: 10, zIndex: 2, color: 'var(--accent)', fontSize: 11, padding: '3px 8px' }}
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
+                    >✏ Edit</button>
+                  )}
+                </div>
               );
             })}
           </div>
         )}
       </div>
 
-      {showModal && <ProjectModal onClose={() => setShowModal(false)} onSaved={() => { setShowModal(false); load(); }} />}
+      {showModal && (
+        <ProjectModal
+          project={editProject}
+          onClose={() => { setShowModal(false); setEditProject(null); }}
+          onSaved={() => { setShowModal(false); setEditProject(null); load(); }}
+        />
+      )}
     </>
   );
 }

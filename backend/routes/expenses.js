@@ -3,7 +3,7 @@ const pool = require('../db/pool');
 const { authenticate, adminOnly } = require('../middleware/auth');
 
 const VALID_CATEGORIES = [
-  'transportation', 'printing_stationery', 'field_work', 'communication', 'miscellaneous'
+  'transportation', 'printing_stationery', 'field_work', 'communication', 'other', 'miscellaneous'
 ];
 
 // GET /api/expenses — list expenses (filtered by project, member, status)
@@ -107,7 +107,7 @@ router.get('/summary', authenticate, async (req, res) => {
 
 // POST /api/expenses — submit a new expense
 router.post('/', authenticate, async (req, res) => {
-  const { project_id, category, description, amount, expense_date, receipt_note } = req.body;
+  const { project_id, category, description, amount, expense_date, receipt_note, other_label } = req.body;
 
   if (!project_id || !category || !description || !amount || !expense_date)
     return res.status(400).json({ error: 'project_id, category, description, amount, expense_date are required' });
@@ -130,11 +130,11 @@ router.post('/', authenticate, async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO expenses
-        (project_id, submitted_by, category, description, amount, expense_date, receipt_note)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+        (project_id, submitted_by, category, description, amount, expense_date, receipt_note, other_label)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
       [project_id, req.user.id, category, description.trim(),
-       Number(amount), expense_date, receipt_note || null]
+       Number(amount), expense_date, receipt_note || null, category === 'other' ? (other_label || null) : null]
     );
 
     // Audit log
@@ -196,7 +196,7 @@ router.patch('/:id/reimburse', authenticate, adminOnly, async (req, res) => {
 // PATCH /api/expenses/:id — edit expense details (only submitter, only if not reimbursed)
 router.patch('/:id', authenticate, async (req, res) => {
   const { id } = req.params;
-  const { description, amount, expense_date, receipt_note, category } = req.body;
+  const { description, amount, expense_date, receipt_note, category, other_label } = req.body;
 
   try {
     const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
@@ -222,9 +222,10 @@ router.patch('/:id', authenticate, async (req, res) => {
         expense_date = COALESCE($3, expense_date),
         receipt_note = COALESCE($4, receipt_note),
         category = COALESCE($5, category),
+        other_label = CASE WHEN $5 = 'other' THEN COALESCE($6, other_label) ELSE NULL END,
         updated_at = NOW()
-       WHERE id = $6 RETURNING *`,
-      [description, amount ? Number(amount) : null, expense_date, receipt_note, category, id]
+       WHERE id = $7 RETURNING *`,
+      [description, amount ? Number(amount) : null, expense_date, receipt_note, category, other_label || null, id]
     );
     res.json(rows[0]);
   } catch (err) {
