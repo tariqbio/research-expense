@@ -79,6 +79,15 @@ export default function Login() {
       <div className="login-panel">
         <div className="login-logo">R</div>
 
+        {/* Mobile-only hero info banner */}
+        <div className="mobile-hero-banner">
+          <span style={{ fontSize: 22 }}>🎓</span>
+          <div>
+            <strong style={{ color: 'rgba(255,255,255,0.75)', display: 'block', marginBottom: 2 }}>FGS Research Expense Tracker</strong>
+            Daffodil International University · Faculty of Graduate Studies
+          </div>
+        </div>
+
         <h1>Welcome back</h1>
         <p className="tagline">
           Sign in to your FGS ResearchTrack account using your institutional email.

@@ -22,11 +22,15 @@ export default function Layout() {
   const location = useLocation();
   const [theme, setTheme] = useState(() => localStorage.getItem('rt-theme') || 'light');
   const [now, setNow] = useState(new Date());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Close sidebar when route changes
+  useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   const clockStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   const dateStr  = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
@@ -44,8 +48,11 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
+      {/* Sidebar overlay (mobile) */}
+      <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
+
       {/* ── Sidebar ── */}
-      <aside className="sidebar">
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="sidebar-logo">R</div>
@@ -107,6 +114,10 @@ export default function Layout() {
       <div className="main-wrapper">
         {/* Topbar */}
         <header className="topbar">
+          {/* Hamburger (mobile only) */}
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(s => !s)} aria-label="Open menu">
+            ☰
+          </button>
           <div className="topbar-breadcrumb">
             <span>{crumbs[0]}</span>
             <span className="topbar-sep">›</span>
