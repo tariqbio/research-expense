@@ -3,7 +3,7 @@ const pool = require('../db/pool');
 const { authenticate, adminOnly } = require('../middleware/auth');
 
 const VALID_CATEGORIES = [
-  'transportation', 'printing_stationery', 'field_work', 'communication', 'other', 'miscellaneous'
+  'transportation', 'printing_stationery', 'field_work', 'communication', 'miscellaneous'
 ];
 
 // GET /api/expenses — list expenses (filtered by project, member, status)
@@ -15,8 +15,11 @@ router.get('/', authenticate, async (req, res) => {
     let params = [];
     let idx = 1;
 
-    // Members can see ALL expenses in their projects (not just their own)
+    // Members can only see their own expenses
     if (req.user.role !== 'admin') {
+      conditions.push(`e.submitted_by = $${idx++}`);
+      params.push(req.user.id);
+      // Also restrict to their projects
       conditions.push(`e.project_id IN (
         SELECT project_id FROM project_members WHERE user_id = $${idx++}
       )`);
@@ -27,7 +30,7 @@ router.get('/', authenticate, async (req, res) => {
     }
 
     if (project_id) { conditions.push(`e.project_id = $${idx++}`); params.push(project_id); }
-    if (reimbursed !== undefined && reimbursed !== '') { conditions.push(`e.reimbursed = $${idx++}`); params.push(reimbursed === 'true'); }
+    if (reimbursed !== undefined) { conditions.push(`e.reimbursed = $${idx++}`); params.push(reimbursed === 'true'); }
     if (category) { conditions.push(`e.category = $${idx++}`); params.push(category); }
     if (from_date) { conditions.push(`e.expense_date >= $${idx++}`); params.push(from_date); }
     if (to_date) { conditions.push(`e.expense_date <= $${idx++}`); params.push(to_date); }
@@ -60,26 +63,14 @@ router.get('/', authenticate, async (req, res) => {
 // GET /api/expenses/summary — aggregated stats per project
 router.get('/summary', authenticate, async (req, res) => {
   try {
+    let projectFilter = '';
+    let params = [];
+
     if (req.user.role !== 'admin') {
-      const { rows } = await pool.query(
-        `SELECT
-          p.id AS project_id,
-          p.code,
-          p.name AS project_name,
-          p.total_budget,
-          COALESCE(SUM(e.amount), 0) AS total_spent,
-          COALESCE(SUM(CASE WHEN e.reimbursed THEN e.amount ELSE 0 END), 0) AS reimbursed,
-          COALESCE(SUM(CASE WHEN NOT e.reimbursed THEN e.amount ELSE 0 END), 0) AS pending,
-          COUNT(e.id) AS expense_count,
-          COUNT(CASE WHEN NOT e.reimbursed THEN 1 END) AS pending_count
-         FROM projects p
-         JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
-         LEFT JOIN expenses e ON e.project_id = p.id
-         GROUP BY p.id
-         ORDER BY p.code`,
-        [req.user.id]
-      );
-      return res.json(rows);
+      projectFilter = `AND e.project_id IN (
+        SELECT project_id FROM project_members WHERE user_id = $1
+      )`;
+      params.push(req.user.id);
     }
 
     const { rows } = await pool.query(
@@ -94,9 +85,11 @@ router.get('/summary', authenticate, async (req, res) => {
         COUNT(e.id) AS expense_count,
         COUNT(CASE WHEN NOT e.reimbursed THEN 1 END) AS pending_count
        FROM projects p
-       LEFT JOIN expenses e ON e.project_id = p.id
+       LEFT JOIN expenses e ON e.project_id = p.id ${projectFilter}
+       ${req.user.role !== 'admin' ? 'JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1' : ''}
        GROUP BY p.id
-       ORDER BY p.code`
+       ORDER BY p.code`,
+      params
     );
     res.json(rows);
   } catch (err) {
@@ -107,7 +100,7 @@ router.get('/summary', authenticate, async (req, res) => {
 
 // POST /api/expenses — submit a new expense
 router.post('/', authenticate, async (req, res) => {
-  const { project_id, category, description, amount, expense_date, receipt_note, other_label } = req.body;
+  const { project_id, category, description, amount, expense_date, receipt_note } = req.body;
 
   if (!project_id || !category || !description || !amount || !expense_date)
     return res.status(400).json({ error: 'project_id, category, description, amount, expense_date are required' });
@@ -130,11 +123,11 @@ router.post('/', authenticate, async (req, res) => {
 
     const { rows } = await pool.query(
       `INSERT INTO expenses
-        (project_id, submitted_by, category, description, amount, expense_date, receipt_note, other_label)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+        (project_id, submitted_by, category, description, amount, expense_date, receipt_note)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
        RETURNING *`,
       [project_id, req.user.id, category, description.trim(),
-       Number(amount), expense_date, receipt_note || null, category === 'other' ? (other_label || null) : null]
+       Number(amount), expense_date, receipt_note || null]
     );
 
     // Audit log
@@ -189,6 +182,70 @@ router.patch('/:id/reimburse', authenticate, adminOnly, async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PATCH /api/expenses/:id — edit expense details (only submitter, only if not reimbursed)
+router.patch('/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { description, amount, expense_date, receipt_note, category } = req.body;
+
+  try {
+    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
+    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
+
+    const exp = current[0];
+
+    // Only submitter or admin can edit
+    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
+      return res.status(403).json({ error: 'Not your expense' });
+
+    // Cannot edit reimbursed expenses
+    if (exp.reimbursed)
+      return res.status(409).json({ error: 'Cannot edit a reimbursed expense' });
+
+    if (category && !VALID_CATEGORIES.includes(category))
+      return res.status(400).json({ error: 'Invalid category' });
+
+    const { rows } = await pool.query(
+      `UPDATE expenses SET
+        description = COALESCE($1, description),
+        amount = COALESCE($2, amount),
+        expense_date = COALESCE($3, expense_date),
+        receipt_note = COALESCE($4, receipt_note),
+        category = COALESCE($5, category),
+        updated_at = NOW()
+       WHERE id = $6 RETURNING *`,
+      [description, amount ? Number(amount) : null, expense_date, receipt_note, category, id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/expenses/:id — submitter or admin can delete (only if not reimbursed)
+router.delete('/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
+    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
+
+    const exp = current[0];
+    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
+      return res.status(403).json({ error: 'Not your expense' });
+    if (exp.reimbursed)
+      return res.status(409).json({ error: 'Cannot delete a reimbursed expense' });
+
+    await pool.query('DELETE FROM expenses WHERE id = $1', [id]);
+    await pool.query(
+      `INSERT INTO audit_log (table_name, record_id, action, changed_by, old_value)
+       VALUES ('expenses', $1, 'deleted', $2, $3)`,
+      [id, req.user.id, JSON.stringify({ amount: exp.amount, category: exp.category })]
+    );
+    res.json({ message: 'Expense deleted' });
+  } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -291,76 +348,5 @@ router.patch('/bulk/category', authenticate, adminOnly, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
-
-
-// PATCH /api/expenses/:id — edit expense details (only submitter, only if not reimbursed)
-router.patch('/:id', authenticate, async (req, res) => {
-  const { id } = req.params;
-  const { description, amount, expense_date, receipt_note, category, other_label } = req.body;
-
-  try {
-    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
-    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
-
-    const exp = current[0];
-
-    // Only submitter or admin can edit
-    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
-      return res.status(403).json({ error: 'Not your expense' });
-
-    // Members cannot edit reimbursed expenses — admin can always edit
-    if (req.user.role !== 'admin' && exp.reimbursed)
-      return res.status(409).json({ error: 'Cannot edit a reimbursed expense' });
-
-    if (category && !VALID_CATEGORIES.includes(category))
-      return res.status(400).json({ error: 'Invalid category' });
-
-    const { rows } = await pool.query(
-      `UPDATE expenses SET
-        description = COALESCE($1, description),
-        amount = COALESCE($2, amount),
-        expense_date = COALESCE($3, expense_date),
-        receipt_note = COALESCE($4, receipt_note),
-        category = COALESCE($5, category),
-        other_label = CASE WHEN $5 = 'other' THEN COALESCE($6, other_label) ELSE NULL END,
-        updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
-      [description, amount ? Number(amount) : null, expense_date, receipt_note, category, other_label || null, id]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// DELETE /api/expenses/:id — submitter or admin can delete (only if not reimbursed)
-router.delete('/:id', authenticate, async (req, res) => {
-  const { id } = req.params;
-  try {
-    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
-    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
-
-    const exp = current[0];
-    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
-      return res.status(403).json({ error: 'Not your expense' });
-    // Members cannot delete reimbursed expenses — admin can always delete
-    if (req.user.role !== 'admin' && exp.reimbursed)
-      return res.status(409).json({ error: 'Cannot delete a reimbursed expense' });
-
-    await pool.query('DELETE FROM expenses WHERE id = $1', [id]);
-    await pool.query(
-      `INSERT INTO audit_log (table_name, record_id, action, changed_by, old_value)
-       VALUES ('expenses', $1, 'deleted', $2, $3)`,
-      [id, req.user.id, JSON.stringify({ amount: exp.amount, category: exp.category })]
-    );
-    res.json({ message: 'Expense deleted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-
-
-
 
 module.exports = router;

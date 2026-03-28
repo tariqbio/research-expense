@@ -6,34 +6,12 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const pool = require('./db/pool');
 
-// ── Auto-run schema + migrations on boot ─────────────────────
+// ── Auto-run schema on first boot ─────────────────────────────
 async function initDB() {
   try {
     const schema = fs.readFileSync(path.join(__dirname, 'db/schema.sql'), 'utf8');
     await pool.query(schema);
     console.log('✅ Database schema ready');
-
-    // Safe incremental migrations (all idempotent)
-    const migrations = [
-      // Add other_label column for 'Other' expense category
-      `ALTER TABLE expenses ADD COLUMN IF NOT EXISTS other_label VARCHAR(150)`,
-      // Fix admin name from seed default to Tariq
-      `UPDATE users SET name = 'Tariq' WHERE email = 'admin@fgs.diu.edu' AND name = 'FGS Admin'`,
-      // Ensure 'other' is a valid category (drop + recreate constraint safely)
-      `DO $$ BEGIN
-         BEGIN ALTER TABLE expenses DROP CONSTRAINT expenses_category_check;
-         EXCEPTION WHEN undefined_object THEN NULL; END;
-         ALTER TABLE expenses ADD CONSTRAINT expenses_category_check
-           CHECK (category IN ('transportation','printing_stationery','field_work','communication','other','miscellaneous'));
-       EXCEPTION WHEN others THEN NULL;
-       END $$`,
-    ];
-
-    for (const sql of migrations) {
-      try { await pool.query(sql); }
-      catch (e) { console.warn('Migration warning:', e.message); }
-    }
-    console.log('✅ Migrations applied');
 
     const hash = await bcrypt.hash('Admin@1234', 10);
     await pool.query(
@@ -63,7 +41,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// ── Debug endpoint ────────────────────────────────────────────
+// ── Debug endpoint (remove after login works) ─────────────────
 app.get('/api/debug', async (req, res) => {
   try {
     const { rows } = await pool.query(
@@ -75,7 +53,6 @@ app.get('/api/debug', async (req, res) => {
     res.json({
       found: true,
       email: user.email,
-      name: user.name,
       role: user.role,
       hash_prefix: user.password.substring(0, 20),
       password_matches: match

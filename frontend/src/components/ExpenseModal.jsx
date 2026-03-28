@@ -1,25 +1,23 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 
-const BASE_CATEGORIES = [
+const CATEGORIES = [
   { value: 'transportation',      label: 'Transportation' },
   { value: 'printing_stationery', label: 'Printing & Stationery' },
   { value: 'field_work',          label: 'Field Work / Data Collection' },
   { value: 'communication',       label: 'Communication' },
-  { value: 'other',               label: 'Other (specify below)' },
+  { value: 'miscellaneous',       label: 'Miscellaneous' },
 ];
 
-export default function ExpenseModal({ projectId, expense, onClose, onSaved }) {
-  const isEdit = !!expense;
+export default function ExpenseModal({ projectId, onClose, onSaved }) {
   const [projects, setProjects] = useState([]);
   const [form, setForm] = useState({
-    project_id:   projectId || expense?.project_id || '',
-    category:     expense?.category || '',
-    description:  expense?.description || '',
-    amount:       expense?.amount || '',
-    expense_date: expense?.expense_date?.split('T')[0] || new Date().toISOString().split('T')[0],
-    receipt_note: expense?.receipt_note || '',
-    other_label:  expense?.category === 'other' ? (expense?.other_label || '') : '',
+    project_id:   projectId || '',
+    category:     '',
+    description:  '',
+    amount:       '',
+    expense_date: new Date().toISOString().split('T')[0],
+    receipt_note: '',
   });
   const [error, setError]   = useState('');
   const [saving, setSaving] = useState(false);
@@ -37,27 +35,12 @@ export default function ExpenseModal({ projectId, expense, onClose, onSaved }) {
     setError('');
     if (!form.project_id) return setError('Please select a project');
     if (!form.category)   return setError('Please select a category');
-    if (form.category === 'other' && !form.other_label.trim())
-      return setError('Please specify the expense type');
     if (!form.amount || isNaN(form.amount) || Number(form.amount) <= 0)
       return setError('Enter a valid positive amount');
 
     setSaving(true);
     try {
-      const payload = {
-        project_id:   form.project_id,
-        category:     form.category,
-        description:  form.description,
-        amount:       Number(form.amount),
-        expense_date: form.expense_date,
-        receipt_note: form.receipt_note,
-        other_label:  form.category === 'other' ? form.other_label.trim() : undefined,
-      };
-      if (isEdit) {
-        await api.patch(`/expenses/${expense.id}`, payload);
-      } else {
-        await api.post('/expenses', payload);
-      }
+      await api.post('/expenses', { ...form, amount: Number(form.amount) });
       onSaved();
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to save expense');
@@ -70,14 +53,14 @@ export default function ExpenseModal({ projectId, expense, onClose, onSaved }) {
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-head">
-          <h3>{isEdit ? 'Edit Expense' : 'Add Expense'}</h3>
+          <h3>Add Expense</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             {error && <div className="notice notice-error">{error}</div>}
 
-            {!projectId && !isEdit && (
+            {!projectId && (
               <div className="form-group">
                 <label className="form-label">Project *</label>
                 <select className="form-select" value={form.project_id} onChange={e => set('project_id', e.target.value)} required>
@@ -92,7 +75,7 @@ export default function ExpenseModal({ projectId, expense, onClose, onSaved }) {
                 <label className="form-label">Category *</label>
                 <select className="form-select" value={form.category} onChange={e => set('category', e.target.value)} required>
                   <option value="">Select…</option>
-                  {BASE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+                  {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                 </select>
               </div>
               <div className="form-group">
@@ -101,14 +84,6 @@ export default function ExpenseModal({ projectId, expense, onClose, onSaved }) {
                   onChange={e => set('expense_date', e.target.value)} required />
               </div>
             </div>
-
-            {form.category === 'other' && (
-              <div className="form-group">
-                <label className="form-label">Specify Expense Type *</label>
-                <input className="form-input" placeholder="e.g. Equipment rental, Software license…"
-                  value={form.other_label} onChange={e => set('other_label', e.target.value)} required />
-              </div>
-            )}
 
             <div className="form-group">
               <label className="form-label">Description *</label>
@@ -132,7 +107,7 @@ export default function ExpenseModal({ projectId, expense, onClose, onSaved }) {
           <div className="modal-foot">
             <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Submit Expense'}
+              {saving ? 'Saving…' : 'Submit Expense'}
             </button>
           </div>
         </form>
