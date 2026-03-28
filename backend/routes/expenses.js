@@ -193,71 +193,6 @@ router.patch('/:id/reimburse', authenticate, adminOnly, async (req, res) => {
   }
 });
 
-// PATCH /api/expenses/:id — edit expense details (only submitter, only if not reimbursed)
-router.patch('/:id', authenticate, async (req, res) => {
-  const { id } = req.params;
-  const { description, amount, expense_date, receipt_note, category, other_label } = req.body;
-
-  try {
-    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
-    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
-
-    const exp = current[0];
-
-    // Only submitter or admin can edit
-    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
-      return res.status(403).json({ error: 'Not your expense' });
-
-    // Cannot edit reimbursed expenses
-    if (exp.reimbursed)
-      return res.status(409).json({ error: 'Cannot edit a reimbursed expense' });
-
-    if (category && !VALID_CATEGORIES.includes(category))
-      return res.status(400).json({ error: 'Invalid category' });
-
-    const { rows } = await pool.query(
-      `UPDATE expenses SET
-        description = COALESCE($1, description),
-        amount = COALESCE($2, amount),
-        expense_date = COALESCE($3, expense_date),
-        receipt_note = COALESCE($4, receipt_note),
-        category = COALESCE($5, category),
-        other_label = CASE WHEN $5 = 'other' THEN COALESCE($6, other_label) ELSE NULL END,
-        updated_at = NOW()
-       WHERE id = $7 RETURNING *`,
-      [description, amount ? Number(amount) : null, expense_date, receipt_note, category, other_label || null, id]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// DELETE /api/expenses/:id — submitter or admin can delete (only if not reimbursed)
-router.delete('/:id', authenticate, async (req, res) => {
-  const { id } = req.params;
-  try {
-    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
-    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
-
-    const exp = current[0];
-    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
-      return res.status(403).json({ error: 'Not your expense' });
-    if (exp.reimbursed)
-      return res.status(409).json({ error: 'Cannot delete a reimbursed expense' });
-
-    await pool.query('DELETE FROM expenses WHERE id = $1', [id]);
-    await pool.query(
-      `INSERT INTO audit_log (table_name, record_id, action, changed_by, old_value)
-       VALUES ('expenses', $1, 'deleted', $2, $3)`,
-      [id, req.user.id, JSON.stringify({ amount: exp.amount, category: exp.category })]
-    );
-    res.json({ message: 'Expense deleted' });
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
 // GET /api/expenses/audit/:id — admin views audit trail for an expense
 router.get('/audit/:id', authenticate, adminOnly, async (req, res) => {
   const { id } = req.params;
@@ -356,5 +291,76 @@ router.patch('/bulk/category', authenticate, adminOnly, async (req, res) => {
     res.status(500).json({ error: 'Server error' });
   }
 });
+
+
+// PATCH /api/expenses/:id — edit expense details (only submitter, only if not reimbursed)
+router.patch('/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  const { description, amount, expense_date, receipt_note, category, other_label } = req.body;
+
+  try {
+    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
+    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
+
+    const exp = current[0];
+
+    // Only submitter or admin can edit
+    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
+      return res.status(403).json({ error: 'Not your expense' });
+
+    // Members cannot edit reimbursed expenses — admin can always edit
+    if (req.user.role !== 'admin' && exp.reimbursed)
+      return res.status(409).json({ error: 'Cannot edit a reimbursed expense' });
+
+    if (category && !VALID_CATEGORIES.includes(category))
+      return res.status(400).json({ error: 'Invalid category' });
+
+    const { rows } = await pool.query(
+      `UPDATE expenses SET
+        description = COALESCE($1, description),
+        amount = COALESCE($2, amount),
+        expense_date = COALESCE($3, expense_date),
+        receipt_note = COALESCE($4, receipt_note),
+        category = COALESCE($5, category),
+        other_label = CASE WHEN $5 = 'other' THEN COALESCE($6, other_label) ELSE NULL END,
+        updated_at = NOW()
+       WHERE id = $7 RETURNING *`,
+      [description, amount ? Number(amount) : null, expense_date, receipt_note, category, other_label || null, id]
+    );
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE /api/expenses/:id — submitter or admin can delete (only if not reimbursed)
+router.delete('/:id', authenticate, async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows: current } = await pool.query('SELECT * FROM expenses WHERE id = $1', [id]);
+    if (!current.length) return res.status(404).json({ error: 'Expense not found' });
+
+    const exp = current[0];
+    if (req.user.role !== 'admin' && exp.submitted_by !== req.user.id)
+      return res.status(403).json({ error: 'Not your expense' });
+    // Members cannot delete reimbursed expenses — admin can always delete
+    if (req.user.role !== 'admin' && exp.reimbursed)
+      return res.status(409).json({ error: 'Cannot delete a reimbursed expense' });
+
+    await pool.query('DELETE FROM expenses WHERE id = $1', [id]);
+    await pool.query(
+      `INSERT INTO audit_log (table_name, record_id, action, changed_by, old_value)
+       VALUES ('expenses', $1, 'deleted', $2, $3)`,
+      [id, req.user.id, JSON.stringify({ amount: exp.amount, category: exp.category })]
+    );
+    res.json({ message: 'Expense deleted' });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+
+
+
 
 module.exports = router;

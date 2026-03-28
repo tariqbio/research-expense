@@ -258,13 +258,15 @@ export default function Expenses() {
                       {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                       <td className="no-print">
                         <div style={{ display: 'flex', gap: 4 }}>
-                          {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
-                            <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)' }}
-                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏</button>
+                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                            <button className="btn btn-ghost btn-xs"
+                              style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
+                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏ Edit</button>
                           )}
-                          {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
-                            <button className="btn btn-ghost btn-xs" onClick={() => handleDelete(e.id)}
-                              style={{ color: 'var(--danger)' }}>Remove</button>
+                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                            <button className="btn btn-ghost btn-xs"
+                              style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}
+                              onClick={() => handleDelete(e.id)}>🗑 Delete</button>
                           )}
                         </div>
                       </td>
