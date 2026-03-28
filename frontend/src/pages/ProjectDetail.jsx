@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api from '../api';
+import api, { downloadReport } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -81,9 +80,15 @@ export default function ProjectDetail() {
   };
 
   // ── XLSX Export ─────────────────────────────────────────────────────────────
-  const handleExportCSV = () => {
-    if (!project) return;
-    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
+  const [exporting, setExporting] = useState(false);
+  const handleExportCSV = async () => {
+    if (!project || exporting) return;
+    setExporting(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      await downloadReport(`/api/reports/project/${id}`, `${project.code}-Report-${today}.xlsx`);
+    } catch (e) { alert('Could not generate report. Please try again.'); }
+    finally { setExporting(false); }
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
@@ -421,7 +426,9 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={exporting}>
+            {exporting ? '⏳ Generating…' : '⬇ Export XLSX'}
+          </button>
           <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           {isAdmin && (

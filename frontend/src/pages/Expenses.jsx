@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import api from '../api';
+import api, { downloadReport } from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
-import { exportExpensesXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -77,8 +76,16 @@ export default function Expenses() {
     return 0;
   });
 
-  const handleExportCSV = () => {
-    exportExpensesXlsx({ displayed, totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS });
+  const [exporting, setExporting] = useState(false);
+  const handleExportCSV = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const params = new URLSearchParams(Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== '')));
+      const today = new Date().toISOString().split('T')[0];
+      await downloadReport(`/api/reports/expenses?${params}`, `Expenses-Report-${today}.xlsx`);
+    } catch (e) { alert('Could not generate report. Please try again.'); }
+    finally { setExporting(false); }
   };
 
   const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category);
@@ -96,7 +103,9 @@ export default function Expenses() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
           <div className="export-bar">
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={exporting}>
+              {exporting ? '⏳ Generating…' : '⬇ Export XLSX'}
+            </button>
             <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
           </div>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>

@@ -57,6 +57,7 @@ app.use(express.json());
 app.use('/api/auth',     require('./routes/auth'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/expenses', require('./routes/expenses'));
+app.use('/api/reports',  require('./routes/reports'));
 
 // ── Health check ──────────────────────────────────────────────
 app.get('/api/health', (req, res) => {

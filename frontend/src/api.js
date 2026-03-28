@@ -25,4 +25,19 @@ api.interceptors.response.use(
   }
 );
 
+// Download a report as an xlsx blob and trigger browser save
+export async function downloadReport(url, filename) {
+  const token = localStorage.getItem('rt_token');
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error('Report generation failed');
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 export default api;
