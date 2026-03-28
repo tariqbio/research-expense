@@ -760,12 +760,24 @@ tfoot td { padding:10px 14px; border-top:2px solid var(--border-strong); font-we
 ───────────────────────────────────────────────────────── */
 @media print {
   .sidebar,.topbar,.btn,.export-bar,.no-print { display:none !important; }
-  .main-wrapper { margin-left:0; }
-  body { background:white; color:black; }
-  .card,.stat-card { box-shadow:none; border:1px solid #ccc; }
-  table { font-size:11px; }
-  .page-header { padding:0 0 16px; }
-  .page-body { padding:0; }
+  .main-wrapper { margin-left:0 !important; }
+  body { background:white !important; color:black !important; min-width:0 !important; }
+  .card,.stat-card { box-shadow:none !important; border:1px solid #ccc !important; }
+  table { font-size:10px !important; width:100% !important; }
+  thead th { font-size:9px !important; padding:5px 6px !important; }
+  tbody td { padding:5px 6px !important; font-size:10px !important; }
+  .page-header { padding:0 0 12px !important; }
+  .page-body { padding:0 !important; }
+  /* Force 3-column stats grid on print */
+  .stats-grid { grid-template-columns:repeat(3,1fr) !important; gap:6px !important; }
+  /* Prevent table rows from breaking across pages */
+  tbody tr { page-break-inside:avoid; }
+  /* Keep section headers with their content */
+  .card-header { page-break-after:avoid; }
+  /* Ensure filter bar is fully hidden */
+  .filter-bar, .filter-field { display:none !important; }
+  /* Remove overflow scroll so table renders fully */
+  .table-wrap { overflow:visible !important; }
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -826,40 +838,69 @@ tfoot td { padding:10px 14px; border-top:2px solid var(--border-strong); font-we
   .page-title { font-size: 18px; }
   .stat-card { padding: 14px 16px; }
 
-  /* Mobile login — show full-screen panel with hero elements baked in */
+  /* Mobile login — full-screen, hero-quality */
   .login-page { grid-template-columns:1fr; }
   .login-hero { display:none; }
   .login-panel {
-    border-left:none;
-    min-height:100vh;
-    padding: 40px 28px;
+    border-left: none;
+    min-height: 100vh;
+    padding: 0 24px 40px;
     justify-content: flex-start;
-    padding-top: 60px;
+    overflow-y: auto;
   }
-  .login-panel::after {
-    content: 'Daffodil International University · FGS';
-    display: block;
-    font-size: 11px;
-    color: rgba(255,255,255,0.25);
+
+  /* Mobile top hero strip — replaces the hidden desktop hero */
+  .login-panel::before {
+    content: none;
+  }
+  .mobile-login-hero-strip {
+    display: flex !important;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
-    margin-top: 4px;
-    letter-spacing: 0.04em;
+    padding: 48px 0 32px;
+    margin-bottom: 8px;
+    position: relative;
   }
-  .login-logo { margin-bottom: 20px; }
+  .mobile-login-hero-strip .m-eyebrow {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    color: #28e98c; background: rgba(40,233,140,0.10); border: 1px solid rgba(40,233,140,0.28);
+    padding: 4px 12px; border-radius: 99px; margin-bottom: 20px;
+    box-shadow: 0 0 18px rgba(40,233,140,0.12);
+  }
+  .mobile-login-hero-strip .m-eyebrow::before {
+    content: ''; width: 5px; height: 5px; background: #28e98c; border-radius: 50%;
+    box-shadow: 0 0 8px rgba(40,233,140,0.9); animation: dotPulse 2s ease-in-out infinite;
+  }
+  .mobile-login-hero-strip .m-headline {
+    font-size: 40px; font-weight: 900; color: #fff; letter-spacing: -0.05em; line-height: 1.0; margin-bottom: 14px;
+  }
+  .mobile-login-hero-strip .m-headline span {
+    background: linear-gradient(135deg,#28e98c,#1bc47d,#34d399);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .mobile-login-hero-strip .m-desc {
+    font-size: 13px; color: rgba(255,255,255,0.42); line-height: 1.75; max-width: 300px; margin: 0 auto 24px;
+  }
+  .mobile-login-hero-strip .m-stats {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 0;
+  }
+  .mobile-login-hero-strip .m-stat {
+    padding: 12px 16px; background: rgba(40,233,140,0.06); border: 1px solid rgba(40,233,140,0.15);
+    border-radius: 10px; text-align: center; min-width: 72px;
+  }
+  .mobile-login-hero-strip .m-stat-val { font-size: 17px; font-weight: 800; color: #28e98c; line-height: 1; }
+  .mobile-login-hero-strip .m-stat-lbl { font-size: 9px; color: rgba(255,255,255,0.30); text-transform: uppercase; letter-spacing: 0.10em; margin-top: 4px; }
+
+  .login-logo { margin-bottom: 6px; margin-top: 0; }
   .login-panel h1 { font-size: 22px; }
   .login-panel .tagline { font-size: 13px; margin-bottom: 24px; }
-  .mobile-hero-banner {
-    display: flex !important;
-    align-items: center; gap: 10px;
-    padding: 12px 16px;
-    background: rgba(40,233,140,0.08);
-    border: 1px solid rgba(40,233,140,0.20);
-    border-radius: var(--r-md);
-    margin-bottom: 28px;
-    font-size: 12px; color: rgba(255,255,255,0.55);
-    line-height: 1.5;
-  }
+
+  /* Legacy mobile-hero-banner — now hidden, replaced by strip */
+  .mobile-hero-banner { display: none !important; }
 }
 
 /* Hide mobile banner on desktop */
 .mobile-hero-banner { display: none; }
+.mobile-login-hero-strip { display: none; }
