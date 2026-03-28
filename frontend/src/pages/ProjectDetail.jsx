@@ -1,40 +1,53 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
+import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-const CAT_LABELS = { transportation:'Transportation', printing_stationery:'Printing & Stationery', field_work:'Field Work', communication:'Communication', miscellaneous:'Miscellaneous' };
-const CAT_BADGE  = { transportation:'badge-teal', printing_stationery:'badge-indigo', field_work:'badge-green', communication:'badge-amber', miscellaneous:'badge-gray' };
+const CAT_LABELS = { transportation:'Transportation', printing_stationery:'Printing & Stationery', field_work:'Field Work', communication:'Communication', other:'Other', miscellaneous:'Miscellaneous' };
+const CAT_BADGE  = { transportation:'badge-teal', printing_stationery:'badge-indigo', field_work:'badge-green', communication:'badge-amber', other:'badge-gray', miscellaneous:'badge-gray' };
+const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category);
 
 export default function ProjectDetail() {
   const { id } = useParams();
   const { isAdmin, user } = useAuth();
   const navigate = useNavigate();
+  const printRef = useRef(null);
 
   const [project, setProject]   = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showExpModal, setShowExpModal]   = useState(false);
+  const [editExpense, setEditExpense]     = useState(null);
   const [showInstModal, setShowInstModal] = useState(false);
+  const [editInstallment, setEditInstallment] = useState(null);
+  const [showEditProject, setShowEditProject] = useState(false);
   const [activeTab, setActiveTab]     = useState('expenses');
   const [reimbursing, setReimbursing] = useState(null);
   const [reimburseFrom, setReimburseFrom] = useState('university');
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [expSearch, setExpSearch] = useState('');
+  const [expSort, setExpSort]     = useState('date_desc');
+  const [expStatus, setExpStatus] = useState('');
 
   const load = async () => {
     try {
-      const [pRes, eRes] = await Promise.all([api.get(`/projects/${id}`), api.get(`/expenses?project_id=${id}`)]);
+      const [pRes, eRes] = await Promise.all([
+        api.get(`/projects/${id}`),
+        api.get(`/expenses?project_id=${id}`)
+      ]);
       setProject(pRes.data); setExpenses(eRes.data);
-    } catch(e) { if (e.response?.status === 403 || e.response?.status === 404) navigate('/'); }
-    finally { setLoading(false); }
+    } catch(e) {
+      if (e.response?.status === 403 || e.response?.status === 404) navigate('/');
+    } finally { setLoading(false); }
   };
   useEffect(() => { load(); }, [id]);
 
@@ -52,29 +65,417 @@ export default function ProjectDetail() {
 
   const handleDeleteProject = async () => {
     setDeleting(true);
-    try {
-      await api.delete(`/projects/${id}`);
-      navigate('/');
-    } catch(e) {
-      setError(e.response?.data?.error || 'Failed to delete project.');
-      setDeleting(false);
-    }
+    try { await api.delete(`/projects/${id}`); navigate('/'); }
+    catch(e) { setError(e.response?.data?.error || 'Failed to delete project.'); setDeleting(false); }
   };
 
   const handleMarkInst = async iid => {
-    try { await api.patch(`/projects/${id}/installments/${iid}`, { status: 'received', received_date: new Date().toISOString().split('T')[0] }); load(); }
-    catch(e) { alert('Failed to update installment.'); }
+    try {
+      await api.patch(`/projects/${id}/installments/${iid}`, {
+        status: 'received',
+        received_date: new Date().toISOString().split('T')[0],
+      });
+      load();
+    } catch(e) { alert('Failed to update installment.'); }
   };
 
+  // ── CSV Export — proper Excel-ready report ──────────────────────────────
   const handleExportCSV = () => {
-    const headers = ['Date', 'Member', 'Category', 'Description', 'Amount', 'Status'];
-    const rows = expenses.map(e => [fmtDate(e.expense_date), e.submitted_by_name, CAT_LABELS[e.category], `"${e.description}"`, Number(e.amount).toFixed(2), e.reimbursed ? 'Reimbursed' : 'Pending']);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `${project?.code}-expenses.csv`; a.click();
+    if (!project) return;
+
+    // Build a proper flat CSV — one sheet style, clearly labeled
+    const rows = [];
+    const BDT = n => Number(n || 0).toFixed(2);
+    const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+
+    // ── Cover info block (key:value pairs so Excel renders cleanly)
+    rows.push(['FIELD', 'VALUE']);
+    rows.push(['Report Type', 'Project Expense Report']);
+    rows.push(['Generated', today]);
+    rows.push(['Project Code', project.code]);
+    rows.push(['Project Title', project.name]);
+    rows.push(['Description', project.description || '']);
+    rows.push(['Status', project.status]);
+    rows.push(['Payment Type', project.payment_type]);
+    rows.push(['Start Date', fmtDate(project.start_date)]);
+    rows.push(['End Date', fmtDate(project.end_date)]);
+    rows.push(['Total Budget (BDT)', BDT(project.total_budget)]);
+    rows.push(['Total Spent (BDT)', BDT(stats.total_spent)]);
+    rows.push(['Reimbursed (BDT)', BDT(stats.total_reimbursed)]);
+    rows.push(['Pending (BDT)', BDT(stats.total_pending)]);
+    rows.push(['Remaining (BDT)', BDT(Number(project.total_budget) - Number(stats.total_spent || 0))]);
+    rows.push([]);
+    rows.push([]);
+
+    // ── Expense records
+    rows.push(['EXPENSE RECORDS']);
+    rows.push(['#', 'Date', 'Researcher', 'Category', 'Description', 'Receipt / Note', 'Amount (BDT)', 'Status', 'Reimbursed By', 'Reimbursed On', 'Source']);
+    expenses.forEach((e, i) => {
+      rows.push([
+        i + 1,
+        fmtDate(e.expense_date),
+        e.submitted_by_name,
+        getCatLabel(e),
+        e.description,
+        e.receipt_note || '',
+        BDT(e.amount),
+        e.reimbursed ? 'Reimbursed' : 'Pending',
+        e.reimbursed ? (e.reimbursed_by_name || '') : '',
+        e.reimbursed ? fmtDate(e.reimbursed_at) : '',
+        e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '',
+      ]);
+    });
+    // Totals row
+    rows.push([
+      '', '', '', '', '', 'TOTAL',
+      BDT(expenses.reduce((a, e) => a + Number(e.amount), 0)),
+      '',
+      BDT(expenses.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0)) + ' reimbursed',
+      '',
+      BDT(expenses.filter(e => !e.reimbursed).reduce((a, e) => a + Number(e.amount), 0)) + ' pending',
+    ]);
+    rows.push([]);
+    rows.push([]);
+
+    // ── Fund installments
+    if (project.installments.length > 0) {
+      rows.push(['FUND INSTALLMENTS']);
+      rows.push(['#', 'Expected Date', 'Amount (BDT)', 'Status', 'Date Received', 'Note']);
+      project.installments.forEach((inst, i) => {
+        rows.push([
+          i + 1,
+          fmtDate(inst.expected_date),
+          BDT(inst.amount),
+          inst.status === 'received' ? 'Received' : 'Pending',
+          inst.received_date ? fmtDate(inst.received_date) : '',
+          inst.note || '',
+        ]);
+      });
+      const received = project.installments.filter(i => i.status === 'received').reduce((a, i) => a + Number(i.amount), 0);
+      const pending  = project.installments.filter(i => i.status !== 'received').reduce((a, i) => a + Number(i.amount), 0);
+      rows.push(['', 'TOTAL', BDT(received + pending), '', BDT(received) + ' received', BDT(pending) + ' pending']);
+      rows.push([]);
+      rows.push([]);
+    }
+
+    // ── Members summary
+    rows.push(['MEMBER SUMMARY']);
+    rows.push(['#', 'Name', 'Email', 'Role', 'Expenses Submitted', 'Total Amount (BDT)', 'Reimbursed (BDT)', 'Pending (BDT)']);
+    project.members.forEach((m, i) => {
+      const me = expenses.filter(e => e.submitted_by === m.id);
+      const mS = me.reduce((a, e) => a + Number(e.amount), 0);
+      const mP = me.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
+      rows.push([i + 1, m.name, m.email, m.role, me.length, BDT(mS), BDT(mP), BDT(mS - mP)]);
+    });
+    rows.push([]);
+    rows.push(['ResearchTrack v2.0', 'FGS · Daffodil International University', 'Developed by Tariqul Islam', '© 2025']);
+
+    // Escape and join
+    const escape = val => {
+      const s = String(val === null || val === undefined ? '' : val);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+    const csv = rows.map(r => r.map(escape).join(',')).join('\r\n');
+
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `${project.code}-Report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
   };
 
-  if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
+  // ── Print — proper A4 PDF report in a new tab ───────────────────────────
+  const handlePrint = () => {
+    if (!project) return;
+    const BDT = n => '&#2547;' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
+    const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+    const totalSpent   = Number(stats.total_spent || 0);
+    const totalReimb   = Number(stats.total_reimbursed || 0);
+    const totalPending = Number(stats.total_pending || 0);
+    const budget       = Number(project.total_budget || 0);
+    const remaining    = budget - totalSpent;
+    const pct          = budget > 0 ? Math.min(100, (totalSpent / budget) * 100).toFixed(1) : '0.0';
+
+    const expRows = expenses.map((e, i) => `
+      <tr class="${i % 2 === 0 ? 'even' : ''}">
+        <td>${fmtDate(e.expense_date)}</td>
+        <td>${e.submitted_by_name}</td>
+        <td><span class="cat-badge">${getCatLabel(e)}</span></td>
+        <td>${e.description}${e.receipt_note ? `<div class="sub">${e.receipt_note}</div>` : ''}</td>
+        <td class="num">${BDT(e.amount)}</td>
+        <td class="${e.reimbursed ? 'status-ok' : 'status-pend'}">${e.reimbursed ? '&#10003; Reimbursed' : 'Pending'}</td>
+      </tr>`).join('');
+
+    const instRows = project.installments.length > 0
+      ? project.installments.map((inst, i) => `
+        <tr class="${i % 2 === 0 ? 'even' : ''}">
+          <td>#${i + 1}</td>
+          <td>${fmtDate(inst.expected_date)}</td>
+          <td class="num">${BDT(inst.amount)}</td>
+          <td class="${inst.status === 'received' ? 'status-ok' : 'status-pend'}">${inst.status === 'received' ? '&#10003; Received' : 'Pending'}</td>
+          <td>${inst.received_date ? fmtDate(inst.received_date) : '—'}</td>
+          <td>${inst.note || '—'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="6" class="empty">No installments recorded</td></tr>';
+
+    const memberRows = project.members.map((m, i) => {
+      const me = expenses.filter(e => e.submitted_by === m.id);
+      const mS = me.reduce((a, e) => a + Number(e.amount), 0);
+      const mP = me.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
+      return `<tr class="${i % 2 === 0 ? 'even' : ''}">
+        <td><strong>${m.name}</strong></td>
+        <td class="sub-text">${m.email}</td>
+        <td>${m.role}</td>
+        <td class="num">${me.length}</td>
+        <td class="num">${BDT(mS)}</td>
+        <td class="num status-ok">${BDT(mP)}</td>
+        <td class="num ${mS - mP > 0 ? 'status-pend' : ''}">${BDT(mS - mP)}</td>
+      </tr>`;
+    }).join('');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${project.code} — Expense Report</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 18mm 16mm 18mm 16mm;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    font-size: 10pt;
+    color: #1a1a1a;
+    background: #fff;
+    line-height: 1.45;
+  }
+
+  /* ── Header ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+    border-bottom: 3pt solid #28e98c;
+  }
+  .header-left { flex: 1; }
+  .inst-name {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #28a870;
+    margin-bottom: 6px;
+  }
+  .proj-code {
+    display: inline-block;
+    background: #e8fff4;
+    color: #0d7a4e;
+    border: 1pt solid #a7f3d0;
+    border-radius: 4pt;
+    padding: 2pt 7pt;
+    font-size: 8pt;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    margin-bottom: 6px;
+  }
+  .proj-title { font-size: 15pt; font-weight: 800; color: #0d1f17; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 4px; }
+  .proj-desc { font-size: 8.5pt; color: #555; margin-top: 3px; }
+  .header-right { text-align: right; padding-left: 20px; }
+  .logo-box {
+    width: 46pt; height: 46pt;
+    background: #0d1f17;
+    border-radius: 8pt;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22pt; font-weight: 900; color: #28e98c;
+    margin-bottom: 5px;
+    margin-left: auto;
+  }
+  .report-date { font-size: 7.5pt; color: #888; }
+
+  /* ── Summary cards ── */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 7px;
+    margin-bottom: 18px;
+  }
+  .sum-card {
+    background: #f8fffe;
+    border: 1pt solid #d1fae5;
+    border-radius: 5pt;
+    padding: 8pt 9pt;
+    text-align: center;
+  }
+  .sum-label { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #888; margin-bottom: 3pt; }
+  .sum-val { font-size: 11pt; font-weight: 800; color: #0d1f17; line-height: 1; }
+  .sum-val.green { color: #16a34a; }
+  .sum-val.amber { color: #d97706; }
+  .sum-val.red   { color: #dc2626; }
+  .sum-val.blue  { color: #0891b2; }
+
+  /* ── Progress bar ── */
+  .progress-wrap { margin-bottom: 18px; }
+  .progress-label { display: flex; justify-content: space-between; font-size: 7.5pt; color: #666; margin-bottom: 4pt; }
+  .progress-bar { height: 7pt; background: #e5e7eb; border-radius: 4pt; overflow: hidden; }
+  .progress-fill { height: 100%; border-radius: 4pt; background: ${pct > 90 ? '#dc2626' : pct > 70 ? '#d97706' : '#28e98c'}; width: ${pct}%; }
+
+  /* ── Section title ── */
+  .section { margin-bottom: 20px; page-break-inside: avoid; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8pt;
+    margin-bottom: 8px;
+    padding-bottom: 5px;
+    border-bottom: 1.5pt solid #e5e7eb;
+  }
+  .section-title { font-size: 9pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: #0d1f17; }
+  .section-count { font-size: 7.5pt; background: #f3f4f6; color: #6b7280; padding: 1pt 6pt; border-radius: 20pt; font-weight: 600; }
+
+  /* ── Tables ── */
+  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+  thead tr { background: #0d1f17; }
+  thead th { padding: 6pt 8pt; font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #fff; text-align: left; }
+  thead th.num { text-align: right; }
+  tbody td { padding: 5.5pt 8pt; border-bottom: 0.5pt solid #f0f0f0; vertical-align: middle; }
+  tbody tr.even td { background: #fafafa; }
+  tbody tr:hover td { background: #f0fff8; }
+  tfoot td { padding: 6pt 8pt; background: #f0fff8; font-weight: 700; border-top: 1.5pt solid #d1fae5; font-size: 8.5pt; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sub { font-size: 7pt; color: #9ca3af; margin-top: 1pt; }
+  .sub-text { font-size: 7.5pt; color: #6b7280; }
+  .empty { text-align: center; color: #9ca3af; padding: 14pt; font-style: italic; }
+  .cat-badge { background: #e8fff4; color: #0d7a4e; border: 0.5pt solid #a7f3d0; border-radius: 3pt; padding: 1pt 5pt; font-size: 7pt; white-space: nowrap; }
+  .status-ok   { color: #16a34a; font-weight: 600; white-space: nowrap; }
+  .status-pend { color: #d97706; font-weight: 600; white-space: nowrap; }
+
+  /* ── Footer ── */
+  .report-footer {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 0.5pt solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7pt;
+    color: #aaa;
+  }
+
+  /* ── Print safety ── */
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .section { page-break-inside: avoid; }
+    .header { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="inst-name">Daffodil International University &nbsp;·&nbsp; Faculty of Graduate Studies</div>
+    <div class="proj-code">${project.code}</div>
+    <div class="proj-title">${project.name}</div>
+    ${project.description ? `<div class="proj-desc">${project.description}</div>` : ''}
+  </div>
+  <div class="header-right">
+    <div class="logo-box">R</div>
+    <div class="report-date">Expense Report<br>${today}</div>
+  </div>
+</div>
+
+<!-- SUMMARY CARDS -->
+<div class="summary-grid">
+  <div class="sum-card"><div class="sum-label">Total Budget</div><div class="sum-val">${BDT(budget)}</div></div>
+  <div class="sum-card"><div class="sum-label">Total Spent</div><div class="sum-val blue">${BDT(totalSpent)}</div></div>
+  <div class="sum-card"><div class="sum-label">Reimbursed</div><div class="sum-val green">${BDT(totalReimb)}</div></div>
+  <div class="sum-card"><div class="sum-label">Pending</div><div class="sum-val amber">${BDT(totalPending)}</div></div>
+  <div class="sum-card"><div class="sum-label">Remaining</div><div class="sum-val ${remaining < 0 ? 'red' : 'green'}">${BDT(remaining)}</div></div>
+  <div class="sum-card"><div class="sum-label">Utilised</div><div class="sum-val ${pct > 90 ? 'red' : pct > 70 ? 'amber' : ''}">${pct}%</div></div>
+</div>
+
+<!-- BUDGET PROGRESS -->
+<div class="progress-wrap">
+  <div class="progress-label"><span>Budget Utilisation</span><span>${BDT(totalSpent)} of ${BDT(budget)}</span></div>
+  <div class="progress-bar"><div class="progress-fill"></div></div>
+</div>
+
+<!-- EXPENSE RECORDS -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Expense Records</div>
+    <div class="section-count">${expenses.length} entries</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th>Date</th><th>Researcher</th><th>Category</th><th>Description</th>
+      <th class="num">Amount</th><th>Status</th>
+    </tr></thead>
+    <tbody>${expRows || '<tr><td colspan="6" class="empty">No expenses recorded</td></tr>'}</tbody>
+    <tfoot><tr>
+      <td colspan="4">Total &mdash; ${expenses.length} record${expenses.length !== 1 ? 's' : ''}</td>
+      <td class="num">${BDT(totalSpent)}</td>
+      <td><span class="status-ok">${BDT(totalReimb)} paid</span> &nbsp;·&nbsp; <span class="status-pend">${BDT(totalPending)} pending</span></td>
+    </tr></tfoot>
+  </table>
+</div>
+
+${project.installments.length > 0 ? `
+<!-- FUND INSTALLMENTS -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Fund Installments</div>
+    <div class="section-count">${project.installments.length} installment${project.installments.length !== 1 ? 's' : ''}</div>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>Expected Date</th><th class="num">Amount</th><th>Status</th><th>Date Received</th><th>Note</th></tr></thead>
+    <tbody>${instRows}</tbody>
+  </table>
+</div>` : ''}
+
+<!-- MEMBER SUMMARY -->
+<div class="section">
+  <div class="section-header">
+    <div class="section-title">Member Summary</div>
+    <div class="section-count">${project.members.length} members</div>
+  </div>
+  <table>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th class="num">Expenses</th><th class="num">Total</th><th class="num">Reimbursed</th><th class="num">Pending</th></tr></thead>
+    <tbody>${memberRows}</tbody>
+  </table>
+</div>
+
+<!-- FOOTER -->
+<div class="report-footer">
+  <span>ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University</span>
+  <span>Developed by Tariqul Islam &nbsp;·&nbsp; &copy; 2025 FGS, DIU</span>
+</div>
+
+<script>
+  // Auto-print after fonts and layout settle
+  window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 400);
+  });
+</script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) {
+      alert('Please allow pop-ups for this site to open the print report.');
+    }
+  };
+
+
+    if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
   if (!project) return null;
 
   const stats = project.stats || {};
@@ -86,30 +487,53 @@ export default function ProjectDetail() {
   const pendingExp     = expenses.filter(e => !e.reimbursed);
   const reimbursedExp  = expenses.filter(e => e.reimbursed);
 
+  // Filter + sort expenses
+  let displayedExp = expenses.filter(e => {
+    const q = expSearch.toLowerCase();
+    const matchQ = !q || e.description.toLowerCase().includes(q) || e.submitted_by_name?.toLowerCase().includes(q) || getCatLabel(e).toLowerCase().includes(q);
+    const matchS = !expStatus || (expStatus === 'pending' ? !e.reimbursed : e.reimbursed);
+    return matchQ && matchS;
+  });
+  displayedExp = [...displayedExp].sort((a, b) => {
+    if (expSort === 'date_desc') return new Date(b.expense_date) - new Date(a.expense_date);
+    if (expSort === 'date_asc')  return new Date(a.expense_date) - new Date(b.expense_date);
+    if (expSort === 'amount_desc') return Number(b.amount) - Number(a.amount);
+    if (expSort === 'amount_asc')  return Number(a.amount) - Number(b.amount);
+    if (expSort === 'name') return a.submitted_by_name?.localeCompare(b.submitted_by_name);
+    return 0;
+  });
+
   return (
     <>
       <div className="page-header">
         <div className="page-header-left">
-          <button className="back-btn" onClick={() => navigate('/')}>← Back to Dashboard</button>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <button className="back-btn" onClick={() => navigate('/')}>← Back</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
             <span className="project-code">{project.code}</span>
-            <span className={`badge ${project.status === 'active' ? 'badge-green' : project.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>{project.status}</span>
+            <span className={`badge ${project.status === 'active' ? 'badge-green' : project.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
+              {project.status === 'completed' ? 'Ended' : project.status}
+            </span>
             <span className="badge badge-gray">{project.payment_type}</span>
           </div>
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8 }} className="no-print">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
           <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export CSV</button>
-          <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
-          <button className="btn btn-primary" onClick={() => setShowExpModal(true)}>+ Add Expense</button>
+          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
+          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           {isAdmin && (
-            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete Project</button>
+            <>
+              <button className="btn btn-outline btn-sm"
+                style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                onClick={() => setShowEditProject(true)}>✏ Edit Project</button>
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+            </>
           )}
         </div>
       </div>
 
-      <div className="page-body">
+      <div className="page-body" ref={printRef}>
         {error && <div className="notice notice-error">⚠ {error}</div>}
 
         <div className="stats-grid">
@@ -119,7 +543,12 @@ export default function ProjectDetail() {
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Funds Received</div><div className="stat-value" style={{ color: 'var(--info)' }}>{fmt(receivedFunds)}</div></div><div className="stat-icon si-teal">🏦</div></div>
-            <div className="stat-note">of {fmt(totalInstalled)} scheduled</div>
+            <div className="stat-note">
+              of {fmt(totalInstalled)} scheduled
+              {totalInstalled > 0 && <span style={{ marginLeft: 6, color: budget - receivedFunds > 0 ? 'var(--warning)' : 'var(--success)' }}>
+                · {fmt(budget - receivedFunds)} outstanding
+              </span>}
+            </div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Spent</div><div className="stat-value">{fmt(spent)}</div></div><div className="stat-icon si-blue">📈</div></div>
@@ -144,7 +573,7 @@ export default function ProjectDetail() {
         <div className="tabs">
           {[
             { key: 'expenses',     label: 'Expenses',     count: expenses.length },
-            { key: 'installments', label: 'Installments', count: project.installments.length },
+            { key: 'installments', label: 'Fund Installments', count: project.installments.length },
             { key: 'members',      label: 'Members',      count: project.members.length },
           ].map(t => (
             <button key={t.key} className={`tab-btn${activeTab === t.key ? ' active' : ''}`} onClick={() => setActiveTab(t.key)}>
@@ -153,7 +582,7 @@ export default function ProjectDetail() {
           ))}
         </div>
 
-        {/* Expenses tab */}
+        {/* ── Expenses tab ── */}
         {activeTab === 'expenses' && (
           <div className="card">
             <div className="card-header">
@@ -163,8 +592,38 @@ export default function ProjectDetail() {
                 <span className="badge badge-green">{reimbursedExp.length} reimbursed</span>
               </div>
             </div>
-            {expenses.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">🧾</div><h4>No expenses yet</h4><p>Add the first expense to this project.</p></div>
+            <div className="filter-bar no-print" style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
+              <div className="filter-field" style={{ flex: 2 }}>
+                <input className="form-input" placeholder="Search description, researcher, category…"
+                  value={expSearch} onChange={e => setExpSearch(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }} />
+              </div>
+              <div className="filter-field">
+                <select className="form-select" value={expStatus} onChange={e => setExpStatus(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
+                  <option value="">All status</option>
+                  <option value="pending">Pending only</option>
+                  <option value="reimbursed">Reimbursed only</option>
+                </select>
+              </div>
+              <div className="filter-field">
+                <select className="form-select" value={expSort} onChange={e => setExpSort(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
+                  <option value="date_desc">Newest first</option>
+                  <option value="date_asc">Oldest first</option>
+                  <option value="amount_desc">Highest amount</option>
+                  <option value="amount_asc">Lowest amount</option>
+                  <option value="name">Researcher A–Z</option>
+                </select>
+              </div>
+              {(expSearch || expStatus) && (
+                <button className="btn btn-ghost btn-xs" onClick={() => { setExpSearch(''); setExpStatus(''); }}>✕ Clear</button>
+              )}
+            </div>
+
+            {displayedExp.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-icon">🧾</div>
+                <h4>{expenses.length === 0 ? 'No expenses yet' : 'No match'}</h4>
+                <p>{expenses.length === 0 ? 'Add the first expense to this project.' : 'Try adjusting your search.'}</p>
+              </div>
             ) : (
               <div className="table-wrap">
                 <table>
@@ -174,27 +633,33 @@ export default function ProjectDetail() {
                     {isAdmin && <th>Source</th>}<th className="no-print"></th>
                   </tr></thead>
                   <tbody>
-                    {expenses.map(e => (
+                    {displayedExp.map(e => (
                       <tr key={e.id}>
                         <td className="td-date">{fmtDate(e.expense_date)}</td>
-                        <td>
+                        <td style={{ minWidth: 100 }}>
                           <div style={{ fontWeight: 600 }}>{e.submitted_by_name}</div>
                           {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid by {e.reimbursed_by_name}</div>}
                         </td>
-                        <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{CAT_LABELS[e.category]}</span></td>
-                        <td style={{ maxWidth: 220 }}>
+                        <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
+                        <td style={{ minWidth: 160 }}>
                           <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
                           {e.receipt_note && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{e.receipt_note}</div>}
                         </td>
                         <td className="td-amount">{fmt(e.amount)}</td>
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
-                        {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
+                        {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                         <td className="no-print">
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {/* Edit — admin can always edit; member only if their own & not reimbursed */}
+                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
+                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
+                            )}
+                            {/* Mark Paid — admin only, only if not reimbursed */}
                             {isAdmin && !e.reimbursed && (
                               reimbursing === e.id ? (
-                                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                                  <select className="form-select" style={{ padding: '4px 8px', fontSize: 12, width: 'auto' }}
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                  <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
                                     value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
                                     <option value="university">University</option>
                                     <option value="project">Project</option>
@@ -206,49 +671,102 @@ export default function ProjectDetail() {
                                 <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Mark Paid</button>
                               )
                             )}
-                            {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
-                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)} style={{ color: 'var(--danger)' }}>Remove</button>
+                            {/* Delete — admin can always delete; member only if their own & not reimbursed */}
+                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)}
+                                style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}>🗑 Delete</button>
                             )}
                           </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
+                  <tfoot><tr>
+                    <td colSpan={isAdmin ? 4 : 4} style={{ color: 'var(--text-secondary)' }}>Total · {displayedExp.length} records</td>
+                    <td className="td-amount">{fmt(displayedExp.reduce((a,e)=>a+Number(e.amount),0))}</td>
+                    <td colSpan={isAdmin ? 3 : 2}>
+                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))}</span>
+                      <span style={{ color: 'var(--text-tertiary)', margin: '0 6px' }}>·</span>
+                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>!e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} pending</span>
+                    </td>
+                  </tr></tfoot>
                 </table>
               </div>
             )}
           </div>
         )}
 
-        {/* Installments tab */}
+        {/* ── Installments tab ── */}
         {activeTab === 'installments' && (
           <div className="card">
             <div className="card-header">
-              <span className="card-title">Fund Installments</span>
-              {isAdmin && <button className="btn btn-outline btn-sm" onClick={() => setShowInstModal(true)}>+ Add Installment</button>}
+              <div>
+                <span className="card-title">Fund Installments</span>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                  Each installment = a portion of the {fmt(budget)} total budget being released. Add multiple installments for staged funding.
+                </div>
+              </div>
+              {isAdmin && (
+                <button className="btn btn-primary btn-sm" onClick={() => { setEditInstallment(null); setShowInstModal(true); }}>
+                  + Add Installment
+                </button>
+              )}
             </div>
+
+            {/* Summary bar */}
+            <div style={{ display: 'flex', gap: 24, padding: '12px 18px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Total Budget</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>{fmt(budget)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Scheduled</div><div style={{ fontSize: 15, fontWeight: 800 }}>{fmt(totalInstalled)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Received</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt(receivedFunds)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Still Pending</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--warning)' }}>{fmt(totalInstalled - receivedFunds)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Unscheduled</div><div style={{ fontSize: 15, fontWeight: 800, color: budget - totalInstalled < 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{fmt(budget - totalInstalled)}</div></div>
+            </div>
+
             {project.installments.length === 0 ? (
-              <div className="empty-state"><div className="empty-icon">🏦</div><h4>No installments</h4><p>No fund installments scheduled yet.</p></div>
+              <div className="empty-state">
+                <div className="empty-icon">🏦</div>
+                <h4>No installments yet</h4>
+                <p>Add installments to track when portions of the budget are received. You can add as many installments as needed (1st, 2nd, 3rd tranche, etc.).</p>
+                {isAdmin && <button className="btn btn-primary btn-sm" onClick={() => { setEditInstallment(null); setShowInstModal(true); }}>+ Add First Installment</button>}
+              </div>
             ) : (
               <div className="table-wrap">
                 <table>
                   <thead><tr>
-                    <th>Expected Date</th><th style={{ textAlign: 'right' }}>Amount</th><th>Status</th><th>Received Date</th><th>Note</th>{isAdmin && <th></th>}
+                    <th>#</th><th>Expected Date</th><th style={{ textAlign: 'right' }}>Amount</th>
+                    <th>Status</th><th>Date Received</th><th>Note</th>
+                    {isAdmin && <th className="no-print">Actions</th>}
                   </tr></thead>
                   <tbody>
-                    {project.installments.map(inst => (
+                    {project.installments.map((inst, idx) => (
                       <tr key={inst.id}>
+                        <td style={{ color: 'var(--text-tertiary)', fontWeight: 700, fontSize: 11 }}>#{idx+1}</td>
                         <td className="td-date">{fmtDate(inst.expected_date)}</td>
                         <td className="td-amount">{fmt(inst.amount)}</td>
-                        <td>{inst.status === 'received' ? <span className="badge badge-green">✓ Received</span> : <span className="badge badge-amber">Pending</span>}</td>
-                        <td className="td-date">{fmtDate(inst.received_date)}</td>
+                        <td>{inst.status === 'received'
+                          ? <span className="badge badge-green">✓ Received</span>
+                          : <span className="badge badge-amber">Pending</span>}
+                        </td>
+                        <td className="td-date" style={{ color: inst.received_date ? 'var(--success)' : 'var(--text-tertiary)' }}>
+                          {fmtDate(inst.received_date)}
+                        </td>
                         <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{inst.note || '—'}</td>
-                        {isAdmin && <td>{inst.status !== 'received' && <button className="btn btn-success btn-xs" onClick={() => handleMarkInst(inst.id)}>Mark Received</button>}</td>}
+                        {isAdmin && (
+                          <td className="no-print">
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)' }}
+                                onClick={() => { setEditInstallment(inst); setShowInstModal(true); }}>✏ Edit</button>
+                              {inst.status !== 'received' && (
+                                <button className="btn btn-success btn-xs" onClick={() => handleMarkInst(inst.id)}>✓ Received</button>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
                   <tfoot><tr>
-                    <td>Total</td>
+                    <td colSpan={2}>Total ({project.installments.length} installment{project.installments.length !== 1 ? 's' : ''})</td>
                     <td className="td-amount">{fmt(totalInstalled)}</td>
                     <td colSpan={isAdmin ? 4 : 3}>
                       <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(receivedFunds)} received</span>
@@ -262,7 +780,7 @@ export default function ProjectDetail() {
           </div>
         )}
 
-        {/* Members tab */}
+        {/* ── Members tab ── */}
         {activeTab === 'members' && (
           <div className="card">
             <div className="card-header"><span className="card-title">Project Members</span></div>
@@ -297,12 +815,33 @@ export default function ProjectDetail() {
         )}
       </div>
 
-      {showExpModal && <ExpenseModal projectId={id} onClose={() => setShowExpModal(false)} onSaved={() => { setShowExpModal(false); load(); }} />}
-      {showInstModal && <InstallmentModal projectId={id} onClose={() => setShowInstModal(false)} onSaved={() => { setShowInstModal(false); load(); }} />}
+      {showExpModal && (
+        <ExpenseModal
+          projectId={id}
+          expense={editExpense}
+          onClose={() => { setShowExpModal(false); setEditExpense(null); }}
+          onSaved={() => { setShowExpModal(false); setEditExpense(null); load(); }}
+        />
+      )}
+      {showInstModal && (
+        <InstallmentModal
+          projectId={id}
+          installment={editInstallment}
+          onClose={() => { setShowInstModal(false); setEditInstallment(null); }}
+          onSaved={() => { setShowInstModal(false); setEditInstallment(null); load(); }}
+        />
+      )}
+      {showEditProject && (
+        <ProjectModal
+          project={project}
+          onClose={() => setShowEditProject(false)}
+          onSaved={() => { setShowEditProject(false); load(); }}
+        />
+      )}
       <ConfirmDialog
         isOpen={deleteConfirm}
         title="Delete Project"
-        message={`Are you sure you want to delete project "${project?.code}"? This will also delete all associated expenses and cannot be undone.`}
+        message={`Are you sure you want to delete project "${project?.code}"? This will also delete all expenses and cannot be undone.`}
         confirmText="Delete"
         cancelText="Cancel"
         isDangerous={true}
