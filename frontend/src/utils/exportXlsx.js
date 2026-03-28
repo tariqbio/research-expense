@@ -28,7 +28,7 @@ const P = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const F   = (o = {}) => ({ name: 'Segoe UI', sz: o.sz ?? 10, bold: o.bold ?? false, italic: o.italic ?? false, color: { argb: o.color ?? 'FF1A1A1A' } });
-const BG  = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb } });
+const BG  = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb }, bgColor: { argb: 'FFFFFFFF' } });
 const AL  = (h = 'left', v = 'center', wrap = false) => ({ horizontal: h, vertical: v, wrapText: wrap });
 const TH  = (argb = P.BORD) => ({ style: 'thin',   color: { argb } });
 const MD  = (argb = P.GREEN_BD) => ({ style: 'medium', color: { argb } });
@@ -104,7 +104,7 @@ export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDa
   // Row 2: dark band — code badge + date
   WR(ws, row, 0, COLS, '', { fill: BG(P.DARK) });
   W(ws, row, 0, ' ' + project.code + ' ', {
-    font: F({ sz: 9, bold: true, color: '0D7A4E' }),
+    font: F({ sz: 9, bold: true, color: 'FF0D7A4E' }),
     fill: BG(P.GREEN_LT), alignment: AL('left'),
     border: { top: TH(P.GREEN_BD), bottom: TH(P.GREEN_BD), left: TH(P.GREEN_BD), right: TH(P.GREEN_BD) },
   });
