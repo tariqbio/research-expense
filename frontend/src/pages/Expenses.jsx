@@ -96,7 +96,7 @@ export default function Expenses() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
           <div className="export-bar">
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
             <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
           </div>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>

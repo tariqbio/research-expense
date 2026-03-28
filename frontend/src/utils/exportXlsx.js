@@ -1,487 +1,391 @@
 /**
- * exportXlsx.js — Professional XLSX matching the PDF design.
- * Uses xlsx-js-style ^1.2.0
+ * exportXlsx.js — HTML-based XLS export.
  *
- * KEY FIX: Every cell in a merged range must have its style explicitly set.
- * Unset cells default to transparent/black in some Excel versions.
+ * Generates a fully styled HTML document and downloads it as .xls.
+ * Excel and Google Sheets open HTML-based XLS files natively with
+ * full color, font, and border support — no library required.
+ * This matches the PDF design exactly using the same CSS values.
  */
-import * as XLSX from 'xlsx-js-style';
 
-// ── Palette ───────────────────────────────────────────────────────────────────
-const P = {
-  DARK:     'FF0D1F17',
-  GREEN:    'FF28E98C',
-  GREEN_LT: 'FFE8FFF4',
-  GREEN_BD: 'FFA7F3D0',
-  SUCCESS:  'FF16A34A',
-  AMBER:    'FFD97706',
-  AMBER_LT: 'FFFEFCE8',
-  RED:      'FFDC2626',
-  BLUE:     'FF0891B2',
-  WHITE:    'FFFFFFFF',
-  ALT:      'FFFAFAFA',
-  SECT_BG:  'FFF3F4F6',
-  SECT_TXT: 'FF6B7280',
-  BORD:     'FFE5E7EB',
-  TOTAL_BG: 'FFF0FFF8',
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-const F   = (o = {}) => ({ name: 'Segoe UI', sz: o.sz ?? 10, bold: o.bold ?? false, italic: o.italic ?? false, color: { argb: o.color ?? 'FF1A1A1A' } });
-const BG  = argb => ({ type: 'pattern', pattern: 'solid', fgColor: { argb }, bgColor: { argb: 'FFFFFFFF' } });
-const AL  = (h = 'left', v = 'center', wrap = false) => ({ horizontal: h, vertical: v, wrapText: wrap });
-const TH  = (argb = P.BORD) => ({ style: 'thin',   color: { argb } });
-const MD  = (argb = P.GREEN_BD) => ({ style: 'medium', color: { argb } });
-const NO  = () => ({ style: 'none', color: { argb: P.WHITE } });
-
+const BDT = v => '৳' + Number(v || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const N   = v => Number(v || 0);
-const BDT = v => '৳' + N(v).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 
-// Write a single cell
-function W(ws, r, c, v, s = {}, t = null) {
-  const addr = XLSX.utils.encode_cell({ r, c });
-  ws[addr] = { v: v ?? '', t: t ?? (typeof v === 'number' ? 'n' : 's'), s };
+// Shared CSS that mirrors the PDF stylesheet exactly
+const CSS = `
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #1a1a1a; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { padding: 6px 10px; font-size: 10pt; }
+
+  /* Header band */
+  .hdr-band  { background: #0d1f17; color: #28e98c; font-size: 8pt; font-weight: bold;
+               text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 10px; }
+  .hdr-title { font-size: 16pt; font-weight: 800; color: #0d1f17; padding: 10px; }
+  .hdr-sub   { font-size: 8pt; color: #6b7280; font-style: italic; padding: 4px 10px 10px; }
+  .hdr-code  { display: inline; background: #e8fff4; color: #0d7a4e; border: 1px solid #a7f3d0;
+               padding: 3px 8px; font-size: 9pt; font-weight: 800; border-radius: 3px; }
+  .hdr-date  { font-size: 8pt; color: #6b7280; font-style: italic; text-align: right; vertical-align: top; }
+  .green-bar { background: #28e98c; height: 4px; }
+  .spacer    { height: 12px; }
+
+  /* Summary cards */
+  .card-label { background: #f3f4f6; color: #6b7280; font-size: 7pt; font-weight: bold;
+                text-transform: uppercase; letter-spacing: 0.07em; text-align: center;
+                border: 1px solid #a7f3d0; border-bottom: none; padding: 5px 8px; }
+  .card-value { background: #e8fff4; font-size: 13pt; font-weight: 800; text-align: center;
+                border: 1px solid #a7f3d0; border-top: 2px solid #a7f3d0; padding: 8px; }
+  .c-dark    { color: #0d1f17; }
+  .c-blue    { color: #0891b2; }
+  .c-green   { color: #16a34a; }
+  .c-amber   { color: #d97706; }
+  .c-red     { color: #dc2626; }
+
+  /* Progress bar */
+  .prog-label { font-size: 8pt; color: #6b7280; padding: 4px 0; }
+  .prog-track { background: #e5e7eb; height: 7px; border-radius: 4px; }
+  .prog-fill  { height: 7px; border-radius: 4px; }
+
+  /* Section headers */
+  .sect-title { font-size: 9pt; font-weight: 800; color: #0d1f17;
+                text-transform: uppercase; letter-spacing: 0.07em;
+                border-bottom: 1.5px solid #e5e7eb; padding: 12px 0 5px; }
+  .sect-count { background: #f3f4f6; color: #6b7280; font-size: 7.5pt;
+                font-weight: 600; padding: 2px 8px; border-radius: 20px;
+                margin-left: 8px; vertical-align: middle; }
+
+  /* Tables */
+  .data-table { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  .data-table thead tr { background: #0d1f17; }
+  .data-table thead th { color: #fff; font-size: 8pt; font-weight: 700;
+                          text-transform: uppercase; letter-spacing: 0.07em;
+                          padding: 7px 10px; text-align: left; }
+  .data-table thead th.num { text-align: right; }
+  .data-table tbody td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0;
+                          font-size: 9.5pt; vertical-align: top; }
+  .data-table tbody tr.alt td { background: #fafafa; }
+  .data-table tfoot td { padding: 7px 10px; background: #f0fff8; font-weight: 700;
+                          border-top: 2px solid #a7f3d0; font-size: 9.5pt; }
+  .num  { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bold { font-weight: 700; }
+  .sub  { font-size: 8pt; color: #9ca3af; margin-top: 2px; }
+
+  /* Badges */
+  .badge-green { color: #16a34a; font-weight: 700; }
+  .badge-amber { color: #d97706; font-weight: 700; background: #fefce8;
+                 padding: 1px 6px; border-radius: 3px; }
+  .cat-badge   { background: #e8fff4; color: #0d7a4e; border: 1px solid #a7f3d0;
+                 padding: 1px 6px; border-radius: 3px; font-size: 8.5pt; white-space: nowrap; }
+
+  /* Footer */
+  .footer { margin-top: 20px; padding-top: 8px; border-top: 1px solid #e5e7eb;
+            font-size: 7.5pt; color: #aaa; display: flex; justify-content: space-between; }
+`;
+
+function downloadXls(html, filename) {
+  const fullHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+    xmlns:x="urn:schemas-microsoft-com:office:excel"
+    xmlns="http://www.w3.org/TR/REC-html40">
+  <head><meta charset="UTF-8">
+  <style>${CSS}</style>
+  <!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets>
+  <x:ExcelWorksheet><x:Name>Expense Report</x:Name>
+  <x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
+  </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->
+  </head><body>${html}</body></html>`;
+
+  const blob = new Blob([fullHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-// Write the same style across a full row range (critical — prevents black cells)
-function WR(ws, r, c1, c2, v, s = {}, t = null) {
-  for (let c = c1; c <= c2; c++) {
-    W(ws, r, c, c === c1 ? v : '', s, c === c1 ? t : 's');
-  }
-}
 
-// Merge helper
-function M(ws, r1, c1, r2, c2) {
-  if (!ws['!merges']) ws['!merges'] = [];
-  ws['!merges'].push({ s: { r: r1, c: c1 }, e: { r: r2, c: c2 } });
-}
-
-// Row height helper
-function RH(ws, r, hpt) {
-  if (!ws['!rows']) ws['!rows'] = [];
-  ws['!rows'][r] = { hpt };
-}
-
-// Write a blank spacer row — WHITE fill across all cols
-function SPACER(ws, r, hpt, cols) {
-  for (let c = 0; c <= cols; c++) W(ws, r, c, '', { fill: BG(P.WHITE) });
-  RH(ws, r, hpt);
-}
-
-// Write a solid colour band row (e.g. green separator)
-function BAND(ws, r, hpt, argb, cols) {
-  for (let c = 0; c <= cols; c++) W(ws, r, c, '', { fill: BG(argb) });
-  RH(ws, r, hpt);
-}
-
-
-// ═════════════════════════════════════════════════════════════════════════════
-//  PROJECT DETAIL EXPORT
-// ═════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// PROJECT DETAIL EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
 export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate }) {
-  const wb   = XLSX.utils.book_new();
-  const ws   = {};
-  const COLS = 6; // 0–6 = 7 columns
-  let   row  = 0;
-
   const budget     = N(project.total_budget);
   const spent      = N(stats.total_spent);
   const reimbursed = N(stats.total_reimbursed);
   const pending    = N(stats.total_pending);
   const remaining  = budget - spent;
   const pct        = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0;
-  const today      = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today      = new Date().toLocaleDateString('en-GB',
+    { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-  // ── HEADER ─────────────────────────────────────────────────────────────────
-  // Row 1: dark band — institution name
-  WR(ws, row, 0, COLS,
-    'DAFFODIL INTERNATIONAL UNIVERSITY  ·  FACULTY OF GRADUATE STUDIES', {
-      font: F({ sz: 8, bold: true, color: P.GREEN }),
-      fill: BG(P.DARK), alignment: AL('left'),
-    }
-  ); M(ws, row, 0, row, COLS); RH(ws, row, 20); row++;
+  const remColor = remaining < 0 ? 'c-red' : 'c-green';
+  const pctColor = pct > 90 ? 'c-red' : pct > 70 ? 'c-amber' : 'c-dark';
+  const barColor = pct > 90 ? '#dc2626' : pct > 70 ? '#d97706' : '#28e98c';
 
-  // Row 2: dark band — code badge + date
-  WR(ws, row, 0, COLS, '', { fill: BG(P.DARK) });
-  W(ws, row, 0, ' ' + project.code + ' ', {
-    font: F({ sz: 9, bold: true, color: 'FF0D7A4E' }),
-    fill: BG(P.GREEN_LT), alignment: AL('left'),
-    border: { top: TH(P.GREEN_BD), bottom: TH(P.GREEN_BD), left: TH(P.GREEN_BD), right: TH(P.GREEN_BD) },
-  });
-  WR(ws, row, 1, COLS, 'Expense Report  ·  ' + today, {
-    font: F({ sz: 8, italic: true, color: P.GREEN_BD }),
-    fill: BG(P.DARK), alignment: AL('right'),
-  }); M(ws, row, 1, row, COLS); RH(ws, row, 18); row++;
+  // Expense rows
+  const expRows = expenses.map((e, i) => `
+    <tr class="${i % 2 === 0 ? 'alt' : ''}">
+      <td>${fmtDate(e.expense_date)}</td>
+      <td>${e.submitted_by_name || ''}</td>
+      <td><span class="cat-badge">${getCatLabel(e)}</span></td>
+      <td>${e.description}${e.receipt_note ? `<div class="sub">${e.receipt_note}</div>` : ''}</td>
+      <td class="num bold">${BDT(e.amount)}</td>
+      <td class="${e.reimbursed ? 'badge-green' : 'badge-amber'}">${e.reimbursed ? '✓ Reimbursed' : 'Pending'}</td>
+    </tr>`).join('');
 
-  // Row 3: project title
-  WR(ws, row, 0, COLS, project.name, {
-    font: F({ sz: 16, bold: true, color: P.DARK }),
-    fill: BG(P.WHITE), alignment: AL('left', 'center', true),
-  }); M(ws, row, 0, row, COLS); RH(ws, row, 44); row++;
+  // Installment rows
+  const instRows = (project.installments || []).map((inst, i) => `
+    <tr class="${i % 2 === 0 ? 'alt' : ''}">
+      <td>#${i + 1}</td>
+      <td>${fmtDate(inst.expected_date)}</td>
+      <td class="num bold">${BDT(inst.amount)}</td>
+      <td class="${inst.status === 'received' ? 'badge-green' : 'badge-amber'}">${inst.status === 'received' ? '✓ Received' : 'Pending'}</td>
+      <td>${inst.received_date ? fmtDate(inst.received_date) : '—'}</td>
+      <td>${inst.note || '—'}</td>
+    </tr>`).join('');
 
-  // Row 4: description (optional)
-  if (project.description) {
-    WR(ws, row, 0, COLS, project.description, {
-      font: F({ sz: 9, italic: true, color: P.SECT_TXT }),
-      fill: BG(P.WHITE), alignment: AL('left', 'center', true),
-    }); M(ws, row, 0, row, COLS); RH(ws, row, 16); row++;
-  }
-
-  // Green separator line
-  BAND(ws, row, 4, P.GREEN, COLS); row++;
-  SPACER(ws, row, 10, COLS); row++;
-
-  // ── SUMMARY CARDS ──────────────────────────────────────────────────────────
-  const cardLabels = ['TOTAL BUDGET', 'TOTAL SPENT', 'REIMBURSED', 'PENDING', 'REMAINING', 'UTILISED'];
-  const cardValues = [BDT(budget), BDT(spent), BDT(reimbursed), BDT(pending), BDT(remaining), pct.toFixed(1) + '%'];
-  const cardColors = [P.DARK, P.BLUE, P.SUCCESS, P.AMBER, remaining < 0 ? P.RED : P.SUCCESS, pct > 90 ? P.RED : pct > 70 ? P.AMBER : P.DARK];
-
-  cardLabels.forEach((lbl, c) => {
-    W(ws, row, c, lbl, {
-      font: F({ sz: 7, bold: true, color: P.SECT_TXT }),
-      fill: BG(P.SECT_BG), alignment: AL('center'),
-      border: { top: MD(), left: TH(P.GREEN_BD), right: TH(P.GREEN_BD), bottom: NO() },
-    });
-  });
-  RH(ws, row, 18); row++;
-
-  cardValues.forEach((val, c) => {
-    W(ws, row, c, val, {
-      font: F({ sz: 13, bold: true, color: cardColors[c] }),
-      fill: BG(P.GREEN_LT), alignment: AL('center'),
-      border: { bottom: MD(), left: TH(P.GREEN_BD), right: TH(P.GREEN_BD), top: NO() },
-    });
-  });
-  RH(ws, row, 30); row++;
-  SPACER(ws, row, 8, COLS); row++;
-
-  // ── PROGRESS BAR ───────────────────────────────────────────────────────────
-  WR(ws, row, 0, 4, 'Budget Utilisation', {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.WHITE), alignment: AL('left'),
-  }); M(ws, row, 0, row, 4);
-  WR(ws, row, 5, COLS, BDT(spent) + ' of ' + BDT(budget), {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.WHITE), alignment: AL('right'),
-  }); M(ws, row, 5, row, COLS); row++;
-
-  const barColor = pct > 90 ? P.RED : pct > 70 ? P.AMBER : P.GREEN;
-  const filled   = Math.max(1, Math.round(pct / 100 * (COLS + 1)));
-  for (let c = 0; c <= COLS; c++) {
-    W(ws, row, c, '', { fill: BG(c < filled ? barColor : P.BORD) });
-  }
-  RH(ws, row, 7); row++;
-  SPACER(ws, row, 14, COLS); row++;
-
-  // ── EXPENSE RECORDS ────────────────────────────────────────────────────────
-  // Section label
-  WR(ws, row, 0, 3, 'EXPENSE RECORDS', {
-    font: F({ sz: 9, bold: true, color: P.DARK }), fill: BG(P.WHITE), alignment: AL('left'),
-  }); M(ws, row, 0, row, 3);
-  WR(ws, row, 4, COLS, expenses.length + ' entr' + (expenses.length === 1 ? 'y' : 'ies'), {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.SECT_BG), alignment: AL('center'),
-    border: { top: TH(), bottom: TH(), left: TH(), right: TH() },
-  }); M(ws, row, 4, row, COLS); RH(ws, row, 20); row++;
-
-  // Table header
-  ['DATE', 'RESEARCHER', 'CATEGORY', 'DESCRIPTION', 'AMOUNT', 'STATUS', ''].forEach((h, c) => {
-    W(ws, row, c, h, {
-      font: F({ sz: 8, bold: true, color: P.WHITE }),
-      fill: BG(P.DARK), alignment: AL(c === 4 ? 'right' : 'left'),
-      border: { bottom: TH(P.GREEN) },
-    });
-  });
-  RH(ws, row, 20); row++;
-
-  // Data rows
-  expenses.forEach((e, i) => {
-    const bg  = i % 2 === 0 ? P.ALT : P.WHITE;
-    const stC = e.reimbursed ? P.SUCCESS : P.AMBER;
-    [
-      fmtDate(e.expense_date),
-      e.submitted_by_name || '',
-      getCatLabel(e),
-      e.description + (e.receipt_note ? '\n' + e.receipt_note : ''),
-      N(e.amount),
-      e.reimbursed ? '✓ Reimbursed' : 'Pending',
-      '',
-    ].forEach((val, c) => {
-      const isAmt = c === 4, isSt = c === 5;
-      W(ws, row, c, val, {
-        font: F({ bold: isAmt || isSt, color: isSt ? stC : 'FF1A1A1A' }),
-        fill: BG(isSt && !e.reimbursed ? P.AMBER_LT : bg),
-        alignment: AL(isAmt ? 'right' : 'left', 'center', c === 3),
-        border: { bottom: TH() },
-        numFmt: isAmt ? '#,##0.00' : undefined,
-      }, isAmt ? 'n' : 's');
-    });
-    RH(ws, row, e.receipt_note ? 28 : 20); row++;
-  });
-
-  // Totals footer
-  WR(ws, row, 0, 3, 'Total — ' + expenses.length + ' record' + (expenses.length !== 1 ? 's' : ''), {
-    font: F({ bold: true, color: P.SECT_TXT }), fill: BG(P.TOTAL_BG), alignment: AL('left'),
-    border: { top: MD(), bottom: MD() },
-  }); M(ws, row, 0, row, 3);
-  W(ws, row, 4, N(stats.total_spent), {
-    font: F({ bold: true, sz: 11, color: P.DARK }), fill: BG(P.TOTAL_BG), alignment: AL('right'),
-    border: { top: MD(), bottom: MD() }, numFmt: '#,##0.00',
-  }, 'n');
-  WR(ws, row, 5, COLS, BDT(reimbursed) + ' paid  ·  ' + BDT(pending) + ' pending', {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.TOTAL_BG), alignment: AL('left'),
-    border: { top: MD(), bottom: MD() },
-  }); M(ws, row, 5, row, COLS);
-  RH(ws, row, 22); row++;
-  SPACER(ws, row, 14, COLS); row++;
-
-  // ── FUND INSTALLMENTS ──────────────────────────────────────────────────────
-  if (project.installments && project.installments.length > 0) {
-    WR(ws, row, 0, 3, 'FUND INSTALLMENTS', {
-      font: F({ sz: 9, bold: true, color: P.DARK }), fill: BG(P.WHITE), alignment: AL('left'),
-    }); M(ws, row, 0, row, 3);
-    WR(ws, row, 4, COLS, project.installments.length + ' installment' + (project.installments.length !== 1 ? 's' : ''), {
-      font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.SECT_BG), alignment: AL('center'),
-      border: { top: TH(), bottom: TH(), left: TH(), right: TH() },
-    }); M(ws, row, 4, row, COLS); RH(ws, row, 20); row++;
-
-    ['#', 'EXPECTED DATE', 'AMOUNT', 'STATUS', 'DATE RECEIVED', 'NOTE', ''].forEach((h, c) => {
-      W(ws, row, c, h, {
-        font: F({ sz: 8, bold: true, color: P.WHITE }),
-        fill: BG(P.DARK), alignment: AL(c === 2 ? 'right' : 'left'),
-        border: { bottom: TH(P.GREEN) },
-      });
-    });
-    RH(ws, row, 20); row++;
-
-    let instTotal = 0;
-    project.installments.forEach((inst, i) => {
-      const bg    = i % 2 === 0 ? P.ALT : P.WHITE;
-      const isRec = inst.status === 'received';
-      instTotal  += N(inst.amount);
-      ['#' + (i + 1), fmtDate(inst.expected_date), N(inst.amount),
-        isRec ? '✓ Received' : 'Pending',
-        inst.received_date ? fmtDate(inst.received_date) : '—',
-        inst.note || '—', '',
-      ].forEach((val, c) => {
-        const isAmt = c === 2, isSt = c === 3;
-        W(ws, row, c, val, {
-          font: F({ bold: isSt, color: isSt ? (isRec ? P.SUCCESS : P.AMBER) : 'FF1A1A1A' }),
-          fill: BG(bg), alignment: AL(isAmt ? 'right' : 'left'),
-          border: { bottom: TH() }, numFmt: isAmt ? '#,##0.00' : undefined,
-        }, isAmt ? 'n' : 's');
-      });
-      RH(ws, row, 20); row++;
-    });
-
-    WR(ws, row, 0, 1, 'Total', {
-      font: F({ bold: true }), fill: BG(P.TOTAL_BG), alignment: AL('left'),
-      border: { top: MD(), bottom: MD() },
-    }); M(ws, row, 0, row, 1);
-    W(ws, row, 2, instTotal, {
-      font: F({ bold: true, sz: 11, color: P.DARK }), fill: BG(P.TOTAL_BG), alignment: AL('right'),
-      border: { top: MD(), bottom: MD() }, numFmt: '#,##0.00',
-    }, 'n');
-    for (let c = 3; c <= COLS; c++) W(ws, row, c, '', { fill: BG(P.TOTAL_BG), border: { top: MD(), bottom: MD() } });
-    RH(ws, row, 22); row++;
-    SPACER(ws, row, 14, COLS); row++;
-  }
-
-  // ── MEMBER SUMMARY ─────────────────────────────────────────────────────────
-  WR(ws, row, 0, 3, 'MEMBER SUMMARY', {
-    font: F({ sz: 9, bold: true, color: P.DARK }), fill: BG(P.WHITE), alignment: AL('left'),
-  }); M(ws, row, 0, row, 3);
-  WR(ws, row, 4, COLS, project.members.length + ' member' + (project.members.length !== 1 ? 's' : ''), {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.SECT_BG), alignment: AL('center'),
-    border: { top: TH(), bottom: TH(), left: TH(), right: TH() },
-  }); M(ws, row, 4, row, COLS); RH(ws, row, 20); row++;
-
-  ['NAME', 'EMAIL', 'ROLE', 'EXPENSES', 'TOTAL', 'REIMBURSED', 'PENDING'].forEach((h, c) => {
-    W(ws, row, c, h, {
-      font: F({ sz: 8, bold: true, color: P.WHITE }),
-      fill: BG(P.DARK), alignment: AL(c >= 3 ? 'right' : 'left'),
-      border: { bottom: TH(P.GREEN) },
-    });
-  });
-  RH(ws, row, 20); row++;
-
-  project.members.forEach((m, i) => {
+  // Member rows
+  const memberRows = (project.members || []).map((m, i) => {
     const me = expenses.filter(e => e.submitted_by === m.id);
     const mS = me.reduce((a, e) => a + N(e.amount), 0);
     const mR = me.filter(e => e.reimbursed).reduce((a, e) => a + N(e.amount), 0);
     const mP = mS - mR;
-    const bg = i % 2 === 0 ? P.ALT : P.WHITE;
-    [m.name, m.email, m.role, me.length, mS, mR, mP].forEach((val, c) => {
-      const isNum = c >= 3;
-      W(ws, row, c, val, {
-        font: F({ bold: c === 0, color: c === 6 && mP > 0 ? P.AMBER : c === 5 ? P.SUCCESS : 'FF1A1A1A' }),
-        fill: BG(bg), alignment: AL(isNum ? 'right' : 'left'),
-        border: { bottom: TH() }, numFmt: c >= 4 ? '#,##0.00' : undefined,
-      }, isNum ? 'n' : 's');
-    });
-    RH(ws, row, 20); row++;
-  });
-  SPACER(ws, row, 14, COLS); row++;
+    return `<tr class="${i % 2 === 0 ? 'alt' : ''}">
+      <td class="bold">${m.name}</td>
+      <td style="color:#6b7280;font-size:8.5pt">${m.email}</td>
+      <td>${m.role}</td>
+      <td class="num">${me.length}</td>
+      <td class="num bold">${BDT(mS)}</td>
+      <td class="num badge-green">${BDT(mR)}</td>
+      <td class="num ${mP > 0 ? 'badge-amber' : ''}">${BDT(mP)}</td>
+    </tr>`;
+  }).join('');
 
-  // ── FOOTER ─────────────────────────────────────────────────────────────────
-  BAND(ws, row, 3, P.GREEN, COLS); row++;
-  WR(ws, row, 0, 3, 'ResearchTrack v2.0  ·  Faculty of Graduate Studies, Daffodil International University', {
-    font: F({ sz: 7, italic: true, color: P.SECT_TXT }), fill: BG(P.WHITE), alignment: AL('left'),
-  }); M(ws, row, 0, row, 3);
-  WR(ws, row, 4, COLS, 'Developed by Tariqul Islam  ·  © 2025 FGS, DIU', {
-    font: F({ sz: 7, italic: true, color: P.SECT_TXT }), fill: BG(P.WHITE), alignment: AL('right'),
-  }); M(ws, row, 4, row, COLS); RH(ws, row, 14); row++;
+  const html = `
+  <!-- HEADER -->
+  <table style="width:100%;margin-bottom:0">
+    <tr>
+      <td colspan="5" class="hdr-band">
+        Daffodil International University &nbsp;·&nbsp; Faculty of Graduate Studies
+      </td>
+    </tr>
+    <tr>
+      <td colspan="4" style="padding:10px 10px 4px;background:#fff">
+        <span class="hdr-code">${project.code}</span>
+      </td>
+      <td class="hdr-date" style="background:#fff;padding:10px 10px 4px">${today}</td>
+    </tr>
+    <tr>
+      <td colspan="5" class="hdr-title">${project.name}</td>
+    </tr>
+    ${project.description ? `<tr><td colspan="5" class="hdr-sub">${project.description}</td></tr>` : ''}
+    <tr><td colspan="5" class="green-bar"></td></tr>
+  </table>
 
-  ws['!ref']  = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: COLS } });
-  ws['!cols'] = [14, 18, 20, 36, 14, 22, 14].map(w => ({ wch: w }));
-  XLSX.utils.book_append_sheet(wb, ws, 'Expense Report');
-  XLSX.writeFile(wb, project.code + '-Report-' + new Date().toISOString().split('T')[0] + '.xlsx', { bookType: 'xlsx', cellStyles: true });
+  <!-- SUMMARY CARDS -->
+  <table style="width:100%;margin-top:14px;margin-bottom:2px">
+    <tr>
+      <td class="card-label">Total Budget</td>
+      <td class="card-label">Total Spent</td>
+      <td class="card-label">Reimbursed</td>
+      <td class="card-label">Pending</td>
+      <td class="card-label">Remaining</td>
+      <td class="card-label">Utilised</td>
+    </tr>
+    <tr>
+      <td class="card-value c-dark">${BDT(budget)}</td>
+      <td class="card-value c-blue">${BDT(spent)}</td>
+      <td class="card-value c-green">${BDT(reimbursed)}</td>
+      <td class="card-value c-amber">${BDT(pending)}</td>
+      <td class="card-value ${remColor}">${BDT(remaining)}</td>
+      <td class="card-value ${pctColor}">${pct.toFixed(1)}%</td>
+    </tr>
+  </table>
+
+  <!-- PROGRESS -->
+  <table style="width:100%;margin-top:10px;margin-bottom:4px">
+    <tr>
+      <td class="prog-label">Budget Utilisation</td>
+      <td class="prog-label" style="text-align:right">${BDT(spent)} of ${BDT(budget)}</td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:0 0 8px">
+        <div class="prog-track">
+          <div class="prog-fill" style="width:${pct.toFixed(1)}%;background:${barColor}"></div>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- EXPENSE RECORDS -->
+  <div class="sect-title">Expense Records <span class="sect-count">${expenses.length} entries</span></div>
+  <table class="data-table">
+    <thead><tr>
+      <th>Date</th><th>Researcher</th><th>Category</th>
+      <th>Description</th><th class="num">Amount</th><th>Status</th>
+    </tr></thead>
+    <tbody>${expRows || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:14px">No expenses recorded</td></tr>'}</tbody>
+    <tfoot><tr>
+      <td colspan="4">Total — ${expenses.length} record${expenses.length !== 1 ? 's' : ''}</td>
+      <td class="num">${BDT(spent)}</td>
+      <td><span class="badge-green">${BDT(reimbursed)} paid</span> &nbsp;·&nbsp; <span class="badge-amber">${BDT(pending)} pending</span></td>
+    </tr></tfoot>
+  </table>
+
+  ${(project.installments || []).length > 0 ? `
+  <!-- FUND INSTALLMENTS -->
+  <div class="sect-title" style="margin-top:20px">Fund Installments
+    <span class="sect-count">${project.installments.length} installment${project.installments.length !== 1 ? 's' : ''}</span>
+  </div>
+  <table class="data-table">
+    <thead><tr>
+      <th>#</th><th>Expected Date</th><th class="num">Amount</th>
+      <th>Status</th><th>Date Received</th><th>Note</th>
+    </tr></thead>
+    <tbody>${instRows}</tbody>
+  </table>` : ''}
+
+  <!-- MEMBER SUMMARY -->
+  <div class="sect-title" style="margin-top:20px">Member Summary
+    <span class="sect-count">${(project.members || []).length} members</span>
+  </div>
+  <table class="data-table">
+    <thead><tr>
+      <th>Name</th><th>Email</th><th>Role</th>
+      <th class="num">Expenses</th><th class="num">Total</th>
+      <th class="num">Reimbursed</th><th class="num">Pending</th>
+    </tr></thead>
+    <tbody>${memberRows}</tbody>
+  </table>
+
+  <!-- FOOTER -->
+  <table style="width:100%;margin-top:20px;border-top:1px solid #e5e7eb">
+    <tr>
+      <td style="font-size:7.5pt;color:#aaa;padding:6px 0">
+        ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University
+      </td>
+      <td style="font-size:7.5pt;color:#aaa;padding:6px 0;text-align:right">
+        Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 FGS, DIU
+      </td>
+    </tr>
+  </table>`;
+
+  const date = new Date().toISOString().split('T')[0];
+  downloadXls(html, `${project.code}-Report-${date}.xls`);
 }
 
 
-// ═════════════════════════════════════════════════════════════════════════════
-//  ALL-EXPENSES PAGE EXPORT
-// ═════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────────────────────────────────────
+// ALL-EXPENSES PAGE EXPORT
+// ─────────────────────────────────────────────────────────────────────────────
 export function exportExpensesXlsx({ displayed, totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS }) {
-  const wb    = XLSX.utils.book_new();
-  const ws    = {};
-  const COLS  = 6;
-  let   row   = 0;
-  const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-  // ── HEADER ─────────────────────────────────────────────────────────────────
-  WR(ws, row, 0, COLS, 'DAFFODIL INTERNATIONAL UNIVERSITY  ·  FACULTY OF GRADUATE STUDIES', {
-    font: F({ sz: 8, bold: true, color: P.GREEN }),
-    fill: BG(P.DARK), alignment: AL('left'),
-  }); M(ws, row, 0, row, COLS); RH(ws, row, 20); row++;
-
-  WR(ws, row, 0, 4, 'RESEARCH EXPENSE REPORT', {
-    font: F({ sz: 16, bold: true, color: P.DARK }),
-    fill: BG(P.WHITE), alignment: AL('left', 'center'),
-  }); M(ws, row, 0, row, 4);
-  WR(ws, row, 5, COLS, today, {
-    font: F({ sz: 8, italic: true, color: P.SECT_TXT }),
-    fill: BG(P.WHITE), alignment: AL('right', 'center'),
-  }); M(ws, row, 5, row, COLS); RH(ws, row, 36); row++;
-
-  BAND(ws, row, 4, P.GREEN, COLS); row++;
-  SPACER(ws, row, 10, COLS); row++;
-
-  // ── SUMMARY CARDS ──────────────────────────────────────────────────────────
-  const rate      = totals.total > 0 ? (totals.reimbursed / totals.total * 100).toFixed(1) + '%' : '0.0%';
-  const sumLabels = ['TOTAL EXPENSES', 'REIMBURSED', 'PENDING', 'REIMBURSEMENT RATE'];
-  const sumValues = [BDT(totals.total), BDT(totals.reimbursed), BDT(totals.pending), rate];
-  const sumColors = [P.DARK, P.SUCCESS, P.AMBER, P.BLUE];
-  // Spans: cols 0-1, 2-3, 4-5, 6-6
-  const spans = [[0,1],[2,3],[4,5],[6,6]];
-
-  sumLabels.forEach((lbl, i) => {
-    const [c1, c2] = spans[i];
-    WR(ws, row, c1, c2, lbl, {
-      font: F({ sz: 7, bold: true, color: P.SECT_TXT }), fill: BG(P.SECT_BG), alignment: AL('center'),
-      border: { top: MD(), left: TH(P.GREEN_BD), right: TH(P.GREEN_BD), bottom: NO() },
-    }); if (c1 !== c2) M(ws, row, c1, row, c2);
-  });
-  RH(ws, row, 18); row++;
-
-  sumValues.forEach((val, i) => {
-    const [c1, c2] = spans[i];
-    WR(ws, row, c1, c2, val, {
-      font: F({ sz: 13, bold: true, color: sumColors[i] }), fill: BG(P.GREEN_LT), alignment: AL('center'),
-      border: { bottom: MD(), left: TH(P.GREEN_BD), right: TH(P.GREEN_BD), top: NO() },
-    }); if (c1 !== c2) M(ws, row, c1, row, c2);
-  });
-  RH(ws, row, 30); row++;
-  SPACER(ws, row, 10, COLS); row++;
-
-  // ── META ───────────────────────────────────────────────────────────────────
-  W(ws, row, 0, 'Generated by', { font: F({ sz: 8, bold: true, color: P.SECT_TXT }), fill: BG(P.SECT_BG), border: { top: TH(), bottom: TH(), left: TH(), right: TH() }, alignment: AL('left') });
-  WR(ws, row, 1, 3, user?.name || '', { font: F({ sz: 8 }), fill: BG(P.WHITE), border: { top: TH(), bottom: TH(), left: TH(), right: TH() }, alignment: AL('left') }); M(ws, row, 1, row, 3);
-  W(ws, row, 4, 'Total Records', { font: F({ sz: 8, bold: true, color: P.SECT_TXT }), fill: BG(P.SECT_BG), border: { top: TH(), bottom: TH(), left: TH(), right: TH() }, alignment: AL('left') });
-  WR(ws, row, 5, COLS, displayed.length, { font: F({ sz: 8, bold: true }), fill: BG(P.WHITE), border: { top: TH(), bottom: TH(), left: TH(), right: TH() }, alignment: AL('right') }, 'n'); M(ws, row, 5, row, COLS);
-  RH(ws, row, 18); row++;
+  const today    = new Date().toLocaleDateString('en-GB',
+    { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const rate     = totals.total > 0
+    ? (totals.reimbursed / totals.total * 100).toFixed(1) + '%' : '0.0%';
 
   // Active filters
   const af = [];
-  if (filters.project_id) { const p = projects.find(p => String(p.id) === String(filters.project_id)); if (p) af.push('Project: ' + p.code); }
+  if (filters.project_id) {
+    const p = projects.find(p => String(p.id) === String(filters.project_id));
+    if (p) af.push(`Project: ${p.code}`);
+  }
   if (filters.reimbursed === 'true')  af.push('Status: Reimbursed');
   if (filters.reimbursed === 'false') af.push('Status: Pending');
-  if (filters.category)  af.push('Category: ' + (CAT_LABELS[filters.category] || filters.category));
-  if (filters.from_date) af.push('From: ' + fmtDate(filters.from_date));
-  if (filters.to_date)   af.push('To: ' + fmtDate(filters.to_date));
-  if (search) af.push('Search: "' + search + '"');
-  if (af.length) {
-    W(ws, row, 0, 'Active Filters', { font: F({ sz: 8, bold: true, color: P.SECT_TXT }), fill: BG(P.SECT_BG), border: { top: TH(), bottom: TH(), left: TH(), right: TH() }, alignment: AL('left') });
-    WR(ws, row, 1, COLS, af.join('  |  '), { font: F({ sz: 8 }), fill: BG(P.WHITE), border: { top: TH(), bottom: TH(), left: TH(), right: TH() }, alignment: AL('left') }); M(ws, row, 1, row, COLS);
-    RH(ws, row, 18); row++;
-  }
-  SPACER(ws, row, 14, COLS); row++;
+  if (filters.category)  af.push(`Category: ${CAT_LABELS[filters.category] || filters.category}`);
+  if (filters.from_date) af.push(`From: ${fmtDate(filters.from_date)}`);
+  if (filters.to_date)   af.push(`To: ${fmtDate(filters.to_date)}`);
+  if (search) af.push(`Search: "${search}"`);
 
-  // ── EXPENSE RECORDS TABLE ──────────────────────────────────────────────────
-  WR(ws, row, 0, 4, 'EXPENSE RECORDS', {
-    font: F({ sz: 9, bold: true, color: P.DARK }), fill: BG(P.WHITE), alignment: AL('left'),
-  }); M(ws, row, 0, row, 4);
-  WR(ws, row, 5, COLS, displayed.length + ' record' + (displayed.length !== 1 ? 's' : ''), {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.SECT_BG), alignment: AL('center'),
-    border: { top: TH(), bottom: TH(), left: TH(), right: TH() },
-  }); M(ws, row, 5, row, COLS); RH(ws, row, 20); row++;
+  const expRows = displayed.map((e, i) => `
+    <tr class="${i % 2 === 0 ? 'alt' : ''}">
+      <td>${fmtDate(e.expense_date)}</td>
+      <td>
+        <div style="font-weight:700;font-size:8.5pt">${e.project_code || ''}</div>
+        <div class="sub">${e.project_name || ''}</div>
+      </td>
+      <td>${e.submitted_by_name || ''}</td>
+      <td><span class="cat-badge">${getCatLabel(e)}</span></td>
+      <td>${e.description}${e.receipt_note ? `<div class="sub">${e.receipt_note}</div>` : ''}</td>
+      <td class="num bold">${BDT(e.amount)}</td>
+      <td class="${e.reimbursed ? 'badge-green' : 'badge-amber'}">${e.reimbursed ? '✓ Reimbursed' : 'Pending'}</td>
+    </tr>`).join('');
 
-  ['DATE', 'PROJECT', 'SUBMITTED BY', 'CATEGORY', 'DESCRIPTION', 'AMOUNT', 'STATUS'].forEach((h, c) => {
-    W(ws, row, c, h, {
-      font: F({ sz: 8, bold: true, color: P.WHITE }),
-      fill: BG(P.DARK), alignment: AL(c === 5 ? 'right' : 'left'),
-      border: { bottom: TH(P.GREEN) },
-    });
-  });
-  RH(ws, row, 20); row++;
+  const html = `
+  <!-- HEADER -->
+  <table style="width:100%">
+    <tr><td colspan="2" class="hdr-band">
+      Daffodil International University &nbsp;·&nbsp; Faculty of Graduate Studies
+    </td></tr>
+    <tr>
+      <td style="padding:10px 10px 6px;font-size:16pt;font-weight:800;color:#0d1f17">
+        Research Expense Report
+      </td>
+      <td style="padding:10px 10px 6px;font-size:8pt;color:#6b7280;text-align:right;vertical-align:bottom;font-style:italic">
+        ${today}
+      </td>
+    </tr>
+    <tr><td colspan="2" class="green-bar"></td></tr>
+  </table>
 
-  displayed.forEach((e, i) => {
-    const bg  = i % 2 === 0 ? P.ALT : P.WHITE;
-    const stC = e.reimbursed ? P.SUCCESS : P.AMBER;
-    [
-      fmtDate(e.expense_date),
-      (e.project_code || '') + (e.project_name ? '\n' + e.project_name : ''),
-      e.submitted_by_name || '',
-      getCatLabel(e),
-      e.description + (e.receipt_note ? '\n' + e.receipt_note : ''),
-      N(e.amount),
-      e.reimbursed ? '✓ Reimbursed' : 'Pending',
-    ].forEach((val, c) => {
-      const isAmt = c === 5, isSt = c === 6;
-      W(ws, row, c, val, {
-        font: F({ bold: isAmt || isSt, color: isSt ? stC : 'FF1A1A1A' }),
-        fill: BG(isSt && !e.reimbursed ? P.AMBER_LT : bg),
-        alignment: AL(isAmt ? 'right' : 'left', 'center', c === 4),
-        border: { bottom: TH() }, numFmt: isAmt ? '#,##0.00' : undefined,
-      }, isAmt ? 'n' : 's');
-    });
-    RH(ws, row, e.receipt_note || e.project_name ? 28 : 20); row++;
-  });
+  <!-- SUMMARY CARDS -->
+  <table style="width:100%;margin-top:14px;margin-bottom:2px">
+    <tr>
+      <td class="card-label" colspan="2">Total Expenses</td>
+      <td class="card-label" colspan="2">Reimbursed</td>
+      <td class="card-label" colspan="2">Pending</td>
+      <td class="card-label">Reimbursement Rate</td>
+    </tr>
+    <tr>
+      <td class="card-value c-dark" colspan="2">${BDT(totals.total)}</td>
+      <td class="card-value c-green" colspan="2">${BDT(totals.reimbursed)}</td>
+      <td class="card-value c-amber" colspan="2">${BDT(totals.pending)}</td>
+      <td class="card-value c-blue">${rate}</td>
+    </tr>
+  </table>
 
-  // Totals
-  WR(ws, row, 0, 4, 'Total  ·  ' + displayed.length + ' records', {
-    font: F({ bold: true, color: P.SECT_TXT }), fill: BG(P.TOTAL_BG), alignment: AL('left'),
-    border: { top: MD(), bottom: MD() },
-  }); M(ws, row, 0, row, 4);
-  W(ws, row, 5, N(totals.total), {
-    font: F({ bold: true, sz: 11, color: P.DARK }), fill: BG(P.TOTAL_BG), alignment: AL('right'),
-    border: { top: MD(), bottom: MD() }, numFmt: '#,##0.00',
-  }, 'n');
-  W(ws, row, 6, BDT(totals.reimbursed) + ' reimb  ·  ' + BDT(totals.pending) + ' pending', {
-    font: F({ sz: 8, color: P.SECT_TXT }), fill: BG(P.TOTAL_BG), alignment: AL('left'),
-    border: { top: MD(), bottom: MD() },
-  });
-  RH(ws, row, 22); row++;
-  SPACER(ws, row, 14, COLS); row++;
+  <!-- META -->
+  <table style="width:100%;margin-top:12px;border-collapse:collapse">
+    <tr>
+      <td style="background:#f3f4f6;border:1px solid #e5e7eb;padding:5px 10px;font-size:8pt;font-weight:bold;color:#6b7280;width:120px">Generated by</td>
+      <td style="background:#fff;border:1px solid #e5e7eb;padding:5px 10px;font-size:8pt">${user?.name || ''}</td>
+      <td style="background:#f3f4f6;border:1px solid #e5e7eb;padding:5px 10px;font-size:8pt;font-weight:bold;color:#6b7280;width:100px">Records</td>
+      <td style="background:#fff;border:1px solid #e5e7eb;padding:5px 10px;font-size:8pt;font-weight:bold">${displayed.length}</td>
+    </tr>
+    ${af.length ? `<tr>
+      <td style="background:#f3f4f6;border:1px solid #e5e7eb;padding:5px 10px;font-size:8pt;font-weight:bold;color:#6b7280">Filters</td>
+      <td colspan="3" style="background:#fff;border:1px solid #e5e7eb;padding:5px 10px;font-size:8pt">${af.join('  ·  ')}</td>
+    </tr>` : ''}
+  </table>
 
-  // ── FOOTER ─────────────────────────────────────────────────────────────────
-  BAND(ws, row, 3, P.GREEN, COLS); row++;
-  WR(ws, row, 0, 3, 'ResearchTrack v2.0  ·  Faculty of Graduate Studies, Daffodil International University', {
-    font: F({ sz: 7, italic: true, color: P.SECT_TXT }), fill: BG(P.WHITE), alignment: AL('left'),
-  }); M(ws, row, 0, row, 3);
-  WR(ws, row, 4, COLS, 'Developed by Tariqul Islam  ·  © 2025 FGS, DIU', {
-    font: F({ sz: 7, italic: true, color: P.SECT_TXT }), fill: BG(P.WHITE), alignment: AL('right'),
-  }); M(ws, row, 4, row, COLS); RH(ws, row, 14); row++;
+  <!-- EXPENSE RECORDS -->
+  <div class="sect-title" style="margin-top:20px">Expense Records
+    <span class="sect-count">${displayed.length} records</span>
+  </div>
+  <table class="data-table">
+    <thead><tr>
+      <th>Date</th><th>Project</th><th>Submitted By</th>
+      <th>Category</th><th>Description</th><th class="num">Amount</th><th>Status</th>
+    </tr></thead>
+    <tbody>${expRows || '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:14px">No expense records</td></tr>'}</tbody>
+    <tfoot><tr>
+      <td colspan="5">Total &nbsp;·&nbsp; ${displayed.length} records</td>
+      <td class="num">${BDT(totals.total)}</td>
+      <td><span class="badge-green">${BDT(totals.reimbursed)} reimb</span> &nbsp;·&nbsp; <span class="badge-amber">${BDT(totals.pending)} pending</span></td>
+    </tr></tfoot>
+  </table>
 
-  ws['!ref']  = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: row, c: COLS } });
-  ws['!cols'] = [12, 20, 18, 20, 32, 14, 18].map(w => ({ wch: w }));
-  XLSX.utils.book_append_sheet(wb, ws, 'Expense Report');
-  XLSX.writeFile(wb, 'Expenses-Report-' + new Date().toISOString().split('T')[0] + '.xlsx', { bookType: 'xlsx', cellStyles: true });
+  <!-- FOOTER -->
+  <table style="width:100%;margin-top:20px;border-top:1px solid #e5e7eb">
+    <tr>
+      <td style="font-size:7.5pt;color:#aaa;padding:6px 0">
+        ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University
+      </td>
+      <td style="font-size:7.5pt;color:#aaa;padding:6px 0;text-align:right">
+        Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 FGS, DIU
+      </td>
+    </tr>
+  </table>`;
+
+  const date = new Date().toISOString().split('T')[0];
+  downloadXls(html, `Expenses-Report-${date}.xls`);
 }

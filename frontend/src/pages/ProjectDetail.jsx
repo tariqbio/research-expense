@@ -477,7 +477,7 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
           <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           {isAdmin && (
