@@ -24,50 +24,37 @@ export default function Login() {
     <div className="login-page">
       {/* Hero panel */}
       <div className="login-hero">
-        {/* Background elements */}
-        <div className="login-hero-grid" />
-        <div className="login-hero-particles">
-          {[...Array(8)].map((_, i) => (
-            <div key={i} className="lp-particle" />
-          ))}
-        </div>
-
         <div className="hero-content">
           <div className="hero-eyebrow">Daffodil International University · FGS</div>
-
           <h1 className="hero-headline">
             Research<br /><span>Expense</span><br />Tracker
           </h1>
-
           <p className="hero-description">
-            A unified platform for managing research project budgets, expense submissions,
-            and reimbursement tracking across all FGS research initiatives.
+            A unified platform for managing research project budgets, expense submissions, and reimbursement tracking across all FGS research initiatives.
           </p>
-
           <div className="hero-features">
             {[
-              { icon: '💰', text: 'Track budgets and fund installments per project' },
-              { icon: '📋', text: 'Submit and categorize research expenses' },
-              { icon: '✅', text: 'Admin-controlled reimbursement with audit trail' },
-              { icon: '🔐', text: 'Role-based access for researchers and admins' },
+              'Track budgets and fund installments per project',
+              'Submit and categorize research expenses',
+              'Admin-controlled reimbursement with audit trail',
+              'Role-based access for researchers and admins',
             ].map((f, i) => (
               <div key={i} className="hero-feature">
-                <div className="hero-feature-dot">{f.icon}</div>
-                {f.text}
+                <div className="hero-feature-dot" />
+                {f}
               </div>
             ))}
           </div>
-
           <div className="hero-stats">
-            <div className="hero-stat-item">
+            <div>
               <div className="hero-stat-val">100%</div>
               <div className="hero-stat-lbl">Audit Trail</div>
             </div>
-            <div className="hero-stat-item">
+            <div>
               <div className="hero-stat-val">Real-time</div>
               <div className="hero-stat-lbl">Budget View</div>
             </div>
-            <div className="hero-stat-item">
+            <div>
               <div className="hero-stat-val">Secure</div>
               <div className="hero-stat-lbl">Role-based</div>
             </div>
@@ -77,23 +64,6 @@ export default function Login() {
 
       {/* Form panel */}
       <div className="login-panel">
-        {/* Mobile-only hero strip — replaces the full desktop hero */}
-        <div className="mobile-login-hero-strip">
-          <div className="m-eyebrow">Daffodil International University · FGS</div>
-          <div className="m-headline">
-            Research<br /><span>Expense</span><br />Tracker
-          </div>
-          <p className="m-desc">
-            A unified platform for managing research project budgets, expense submissions,
-            and reimbursement tracking across all FGS research initiatives.
-          </p>
-          <div className="m-stats">
-            <div className="m-stat"><div className="m-stat-val">100%</div><div className="m-stat-lbl">Audit Trail</div></div>
-            <div className="m-stat"><div className="m-stat-val">Live</div><div className="m-stat-lbl">Budget View</div></div>
-            <div className="m-stat"><div className="m-stat-val">Secure</div><div className="m-stat-lbl">Role-based</div></div>
-          </div>
-        </div>
-
         <div className="login-logo">R</div>
 
         <h1>Welcome back</h1>
@@ -123,7 +93,7 @@ export default function Login() {
           </div>
 
           <button type="submit" className="btn btn-primary"
-            style={{ width: '100%', justifyContent: 'center', padding: '12px 16px', fontSize: 14 }}
+            style={{ width: '100%', justifyContent: 'center', padding: '11px 16px', fontSize: 14 }}
             disabled={loading}>
             {loading ? '⏳ Verifying…' : 'Sign In →'}
           </button>
@@ -132,7 +102,7 @@ export default function Login() {
         <div className="login-footer-text">
           🔒 Authorized personnel only. All access is logged and monitored.<br />
           Faculty of Graduate Studies · Daffodil International University · 2025<br />
-          Developed by <strong>Tariqul Islam</strong>
+          Developed by <strong style={{ color: 'var(--text-secondary)' }}>Tariqul Islam</strong>
         </div>
       </div>
     </div>

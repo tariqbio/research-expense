@@ -1,19 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 
-export default function ProjectModal({ project, onClose, onSaved }) {
-  const isEdit = !!project;
+export default function ProjectModal({ onClose, onSaved }) {
   const [members, setMembers] = useState([]);
   const [form, setForm] = useState({
-    code:         project?.code || '',
-    name:         project?.name || '',
-    description:  project?.description || '',
-    total_budget: project?.total_budget || '',
-    payment_type: project?.payment_type || 'installment',
-    status:       project?.status || 'active',
-    start_date:   project?.start_date?.split('T')[0] || '',
-    end_date:     project?.end_date?.split('T')[0] || '',
-    member_ids:   [],
+    code: '', name: '', description: '',
+    total_budget: '', payment_type: 'installment',
+    start_date: '', end_date: '',
+    member_ids: [],
   });
   const [error, setError]   = useState('');
   const [saving, setSaving] = useState(false);
@@ -39,27 +33,15 @@ export default function ProjectModal({ project, onClose, onSaved }) {
     if (!form.code || !form.name) return setError('Code and name are required');
     setSaving(true);
     try {
-      if (isEdit) {
-        await api.patch(`/projects/${project.id}`, {
-          name:         form.name,
-          description:  form.description,
-          total_budget: form.total_budget ? Number(form.total_budget) : 0,
-          payment_type: form.payment_type,
-          status:       form.status,
-          start_date:   form.start_date || null,
-          end_date:     form.end_date || null,
-        });
-      } else {
-        await api.post('/projects', {
-          ...form,
-          total_budget: form.total_budget ? Number(form.total_budget) : 0,
-          start_date: form.start_date || null,
-          end_date: form.end_date || null,
-        });
-      }
+      await api.post('/projects', {
+        ...form,
+        total_budget: form.total_budget ? Number(form.total_budget) : 0,
+        start_date: form.start_date || null,
+        end_date: form.end_date || null,
+      });
       onSaved();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save project');
+      setError(err.response?.data?.error || 'Failed to create project');
     } finally {
       setSaving(false);
     }
@@ -67,9 +49,9 @@ export default function ProjectModal({ project, onClose, onSaved }) {
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 600 }}>
+      <div className="modal" style={{ maxWidth: 580 }}>
         <div className="modal-head">
-          <h3>{isEdit ? `Edit Project — ${project.code}` : 'New Research Project'}</h3>
+          <h3>New Research Project</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <form onSubmit={handleSubmit}>
@@ -80,9 +62,8 @@ export default function ProjectModal({ project, onClose, onSaved }) {
               <div className="form-group">
                 <label className="form-label">Project Code *</label>
                 <input className="form-input" placeholder="e.g. FGS-2024-01" value={form.code}
-                  onChange={e => set('code', e.target.value.toUpperCase())}
-                  disabled={isEdit} required />
-                {!isEdit && <div className="form-hint">Unique short identifier — cannot be changed later</div>}
+                  onChange={e => set('code', e.target.value.toUpperCase())} required />
+                <div className="form-hint">Unique short identifier</div>
               </div>
               <div className="form-group">
                 <label className="form-label">Payment Type *</label>
@@ -112,30 +93,16 @@ export default function ProjectModal({ project, onClose, onSaved }) {
                 <input type="number" className="form-input" placeholder="0.00" min="0" step="0.01"
                   value={form.total_budget} onChange={e => set('total_budget', e.target.value)} />
               </div>
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-select" value={form.status} onChange={e => set('status', e.target.value)}>
-                  <option value="active">Active</option>
-                  <option value="completed">Completed / Ended</option>
-                  <option value="on_hold">On Hold</option>
-                </select>
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div>
+                  <label className="form-label">Start Date</label>
+                  <input type="date" className="form-input" value={form.start_date}
+                    onChange={e => set('start_date', e.target.value)} />
+                </div>
               </div>
             </div>
 
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Start Date</label>
-                <input type="date" className="form-input" value={form.start_date}
-                  onChange={e => set('start_date', e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">End Date</label>
-                <input type="date" className="form-input" value={form.end_date}
-                  onChange={e => set('end_date', e.target.value)} />
-              </div>
-            </div>
-
-            {!isEdit && members.length > 0 && (
+            {members.length > 0 && (
               <div className="form-group">
                 <label className="form-label">Add Team Members</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
@@ -160,7 +127,7 @@ export default function ProjectModal({ project, onClose, onSaved }) {
           <div className="modal-foot">
             <button type="button" className="btn btn-outline" onClick={onClose}>Cancel</button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Project'}
+              {saving ? 'Creating…' : 'Create Project'}
             </button>
           </div>
         </form>
