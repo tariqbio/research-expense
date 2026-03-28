@@ -6,6 +6,7 @@ import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -79,109 +80,10 @@ export default function ProjectDetail() {
     } catch(e) { alert('Failed to update installment.'); }
   };
 
-  // ── CSV Export — proper Excel-ready report ──────────────────────────────
+  // ── XLSX Export ─────────────────────────────────────────────────────────────
   const handleExportCSV = () => {
     if (!project) return;
-
-    // Build a proper flat CSV — one sheet style, clearly labeled
-    const rows = [];
-    const BDT = n => Number(n || 0).toFixed(2);
-    const today = new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
-
-    // ── Cover info block (key:value pairs so Excel renders cleanly)
-    rows.push(['FIELD', 'VALUE']);
-    rows.push(['Report Type', 'Project Expense Report']);
-    rows.push(['Generated', today]);
-    rows.push(['Project Code', project.code]);
-    rows.push(['Project Title', project.name]);
-    rows.push(['Description', project.description || '']);
-    rows.push(['Status', project.status]);
-    rows.push(['Payment Type', project.payment_type]);
-    rows.push(['Start Date', fmtDate(project.start_date)]);
-    rows.push(['End Date', fmtDate(project.end_date)]);
-    rows.push(['Total Budget (BDT)', BDT(project.total_budget)]);
-    rows.push(['Total Spent (BDT)', BDT(stats.total_spent)]);
-    rows.push(['Reimbursed (BDT)', BDT(stats.total_reimbursed)]);
-    rows.push(['Pending (BDT)', BDT(stats.total_pending)]);
-    rows.push(['Remaining (BDT)', BDT(Number(project.total_budget) - Number(stats.total_spent || 0))]);
-    rows.push([]);
-    rows.push([]);
-
-    // ── Expense records
-    rows.push(['EXPENSE RECORDS']);
-    rows.push(['#', 'Date', 'Researcher', 'Category', 'Description', 'Receipt / Note', 'Amount (BDT)', 'Status', 'Reimbursed By', 'Reimbursed On', 'Source']);
-    expenses.forEach((e, i) => {
-      rows.push([
-        i + 1,
-        fmtDate(e.expense_date),
-        e.submitted_by_name,
-        getCatLabel(e),
-        e.description,
-        e.receipt_note || '',
-        BDT(e.amount),
-        e.reimbursed ? 'Reimbursed' : 'Pending',
-        e.reimbursed ? (e.reimbursed_by_name || '') : '',
-        e.reimbursed ? fmtDate(e.reimbursed_at) : '',
-        e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '',
-      ]);
-    });
-    // Totals row
-    rows.push([
-      '', '', '', '', '', 'TOTAL',
-      BDT(expenses.reduce((a, e) => a + Number(e.amount), 0)),
-      '',
-      BDT(expenses.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0)) + ' reimbursed',
-      '',
-      BDT(expenses.filter(e => !e.reimbursed).reduce((a, e) => a + Number(e.amount), 0)) + ' pending',
-    ]);
-    rows.push([]);
-    rows.push([]);
-
-    // ── Fund installments
-    if (project.installments.length > 0) {
-      rows.push(['FUND INSTALLMENTS']);
-      rows.push(['#', 'Expected Date', 'Amount (BDT)', 'Status', 'Date Received', 'Note']);
-      project.installments.forEach((inst, i) => {
-        rows.push([
-          i + 1,
-          fmtDate(inst.expected_date),
-          BDT(inst.amount),
-          inst.status === 'received' ? 'Received' : 'Pending',
-          inst.received_date ? fmtDate(inst.received_date) : '',
-          inst.note || '',
-        ]);
-      });
-      const received = project.installments.filter(i => i.status === 'received').reduce((a, i) => a + Number(i.amount), 0);
-      const pending  = project.installments.filter(i => i.status !== 'received').reduce((a, i) => a + Number(i.amount), 0);
-      rows.push(['', 'TOTAL', BDT(received + pending), '', BDT(received) + ' received', BDT(pending) + ' pending']);
-      rows.push([]);
-      rows.push([]);
-    }
-
-    // ── Members summary
-    rows.push(['MEMBER SUMMARY']);
-    rows.push(['#', 'Name', 'Email', 'Role', 'Expenses Submitted', 'Total Amount (BDT)', 'Reimbursed (BDT)', 'Pending (BDT)']);
-    project.members.forEach((m, i) => {
-      const me = expenses.filter(e => e.submitted_by === m.id);
-      const mS = me.reduce((a, e) => a + Number(e.amount), 0);
-      const mP = me.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
-      rows.push([i + 1, m.name, m.email, m.role, me.length, BDT(mS), BDT(mP), BDT(mS - mP)]);
-    });
-    rows.push([]);
-    rows.push(['ResearchTrack v2.0', 'FGS · Daffodil International University', 'Developed by Tariqul Islam', '© 2025']);
-
-    // Escape and join
-    const escape = val => {
-      const s = String(val === null || val === undefined ? '' : val);
-      if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
-      return s;
-    };
-    const csv = rows.map(r => r.map(escape).join(',')).join('\r\n');
-
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `${project.code}-Report-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
+    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
@@ -519,7 +421,7 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export CSV</button>
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
           <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           {isAdmin && (
