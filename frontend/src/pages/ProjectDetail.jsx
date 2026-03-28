@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api, { downloadReport } from '../api';
+import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -80,15 +81,9 @@ export default function ProjectDetail() {
   };
 
   // ── XLSX Export ─────────────────────────────────────────────────────────────
-  const [exporting, setExporting] = useState(false);
-  const handleExportCSV = async () => {
-    if (!project || exporting) return;
-    setExporting(true);
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      await downloadReport(`/api/reports/project/${id}`, `${project.code}-Report-${today}.xlsx`);
-    } catch (e) { alert('Could not generate report. Please try again.'); }
-    finally { setExporting(false); }
+  const handleExportCSV = () => {
+    if (!project) return;
+    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
@@ -145,7 +140,7 @@ export default function ProjectDetail() {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
 <title>${project.code} — Expense Report</title>
 <style>
   @page {
@@ -153,24 +148,31 @@ export default function ProjectDetail() {
     margin: 18mm 16mm 18mm 16mm;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html {
+    /* Force desktop-equivalent rendering width on all devices */
+    min-width: 700px;
+  }
   body {
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     font-size: 10pt;
     color: #1a1a1a;
     background: #fff;
     line-height: 1.45;
+    min-width: 700px;
+    width: 100%;
   }
 
   /* ── Header ── */
   .header {
-    display: flex;
+    display: flex !important;
+    flex-direction: row !important;
     align-items: flex-start;
     justify-content: space-between;
     padding-bottom: 14px;
     margin-bottom: 18px;
     border-bottom: 3pt solid #28e98c;
   }
-  .header-left { flex: 1; }
+  .header-left { flex: 1; min-width: 0; }
   .inst-name {
     font-size: 8pt;
     font-weight: 700;
@@ -208,9 +210,10 @@ export default function ProjectDetail() {
   /* ── Summary cards ── */
   .summary-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(6, 1fr) !important;
     gap: 7px;
     margin-bottom: 18px;
+    min-width: 0;
   }
   .sum-card {
     background: #f8fffe;
@@ -267,7 +270,9 @@ export default function ProjectDetail() {
     margin-top: 20px;
     padding-top: 10px;
     border-top: 0.5pt solid #e5e7eb;
-    display: flex;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
     justify-content: space-between;
     font-size: 7pt;
     color: #aaa;
@@ -278,6 +283,16 @@ export default function ProjectDetail() {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .section { page-break-inside: avoid; }
     .header { page-break-after: avoid; }
+  }
+
+  /* ── Force desktop layout on mobile screens (prevents reflowing before print) ── */
+  @media screen and (max-width: 900px) {
+    html, body { min-width: 700px !important; }
+    .header { display: flex !important; flex-direction: row !important; }
+    .summary-grid { grid-template-columns: repeat(6, 1fr) !important; }
+    table { font-size: 8pt !important; }
+    thead th { padding: 4pt 5pt !important; }
+    tbody td { padding: 4pt 5pt !important; }
   }
 </style>
 </head>
@@ -375,9 +390,18 @@ ${project.installments.length > 0 ? `
 
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url  = URL.createObjectURL(blob);
+    // Try window.open first; on mobile browsers that block popups,
+    // fall back to a hidden anchor click which bypasses popup blockers.
     const win  = window.open(url, '_blank');
     if (!win) {
-      alert('Please allow pop-ups for this site to open the print report.');
+      const a = document.createElement('a');
+      a.href = url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
   };
 
@@ -426,9 +450,7 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} disabled={exporting}>
-            {exporting ? '⏳ Generating…' : '⬇ Export XLSX'}
-          </button>
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
           <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           {isAdmin && (
