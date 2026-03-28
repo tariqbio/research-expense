@@ -77,17 +77,112 @@ export default function Expenses() {
   });
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Project', 'Member', 'Category', 'Description', 'Amount', 'Status', 'Reimbursed From'];
-    const rows = displayed.map(e => [
-      fmtDate(e.expense_date), e.project_code, e.submitted_by_name,
-      e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category),
-      `"${e.description}"`, Number(e.amount).toFixed(2),
-      e.reimbursed ? 'Reimbursed' : 'Pending', e.reimbursed_from || '',
+    const rows = [];
+    const BDT = n => Number(n || 0).toFixed(2);
+    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    const escape = val => {
+      const s = String(val === null || val === undefined ? '' : val);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    };
+
+    // ── Report header block ──────────────────────────────────────────────────
+    rows.push(['RESEARCH EXPENSE REPORT', '', '', '', '', '', '', '', '']);
+    rows.push(['Faculty of Graduate Studies · Daffodil International University', '', '', '', '', '', '', '', '']);
+    rows.push([]);
+    rows.push(['Generated On', today, '', 'Total Records', displayed.length, '', 'Exported By', user?.name || '', '']);
+    rows.push([]);
+
+    // ── Summary figures block ────────────────────────────────────────────────
+    rows.push(['FINANCIAL SUMMARY', '', '', '', '', '', '', '', '']);
+    rows.push(['Metric', 'Amount (BDT)', '', '', '', '', '', '', '']);
+
+    // We'll compute row numbers for formulas once the expense data rows are placed
+    // For now write literal values — formulas reference the data table below
+    const expenseStartRow = rows.length + 7; // approx offset; we'll use literals + SUM formulas
+    rows.push(['Total Expenses', BDT(totals.total), '', '', '', '', '', '', '']);
+    rows.push(['Reimbursed', BDT(totals.reimbursed), '', '', '', '', '', '', '']);
+    rows.push(['Pending Reimbursement', BDT(totals.pending), '', '', '', '', '', '', '']);
+    rows.push(['Reimbursement Rate (%)', totals.total > 0 ? ((totals.reimbursed / totals.total) * 100).toFixed(1) + '%' : '0.0%', '', '', '', '', '', '', '']);
+    rows.push([]);
+
+    // ── Active filters note ──────────────────────────────────────────────────
+    const activeFilters = [];
+    if (filters.project_id) { const p = projects.find(p => String(p.id) === String(filters.project_id)); if (p) activeFilters.push(`Project: ${p.code} — ${p.name}`); }
+    if (filters.reimbursed === 'true')  activeFilters.push('Status: Reimbursed only');
+    if (filters.reimbursed === 'false') activeFilters.push('Status: Pending only');
+    if (filters.category) activeFilters.push(`Category: ${CAT_LABELS[filters.category] || filters.category}`);
+    if (filters.from_date) activeFilters.push(`From: ${fmtDate(filters.from_date)}`);
+    if (filters.to_date)   activeFilters.push(`To: ${fmtDate(filters.to_date)}`);
+    if (search) activeFilters.push(`Search: "${search}"`);
+    if (activeFilters.length) {
+      rows.push(['ACTIVE FILTERS', activeFilters.join('  |  '), '', '', '', '', '', '', '']);
+      rows.push([]);
+    }
+
+    // ── Category breakdown ───────────────────────────────────────────────────
+    rows.push(['BREAKDOWN BY CATEGORY', '', '', '', '', '', '', '', '']);
+    rows.push(['Category', 'Count', 'Total (BDT)', 'Reimbursed (BDT)', 'Pending (BDT)', '% of Total', '', '', '']);
+    const catMap = {};
+    displayed.forEach(e => {
+      const key = getCatLabel(e);
+      if (!catMap[key]) catMap[key] = { count: 0, total: 0, reimbursed: 0 };
+      catMap[key].count++;
+      catMap[key].total += Number(e.amount);
+      if (e.reimbursed) catMap[key].reimbursed += Number(e.amount);
+    });
+    Object.entries(catMap).sort((a, b) => b[1].total - a[1].total).forEach(([cat, d]) => {
+      rows.push([
+        cat, d.count, BDT(d.total), BDT(d.reimbursed), BDT(d.total - d.reimbursed),
+        totals.total > 0 ? ((d.total / totals.total) * 100).toFixed(1) + '%' : '0.0%',
+        '', '', '',
+      ]);
+    });
+    rows.push(['TOTAL', displayed.length, BDT(totals.total), BDT(totals.reimbursed), BDT(totals.pending), '100.0%', '', '', '']);
+    rows.push([]);
+
+    // ── Expense records table ────────────────────────────────────────────────
+    rows.push(['EXPENSE RECORDS', '', '', '', '', '', '', '', '']);
+    rows.push([
+      '#', 'Date', 'Project Code', 'Project Name', 'Submitted By',
+      'Category', 'Description', 'Receipt / Note',
+      'Amount (BDT)', 'Status', 'Reimbursed From', 'Reimbursed By', 'Reimbursed On',
     ]);
-    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+
+    displayed.forEach((e, i) => {
+      rows.push([
+        i + 1,
+        fmtDate(e.expense_date),
+        e.project_code || '',
+        e.project_name || '',
+        e.submitted_by_name || '',
+        getCatLabel(e),
+        e.description || '',
+        e.receipt_note || '',
+        BDT(e.amount),
+        e.reimbursed ? 'Reimbursed' : 'Pending',
+        e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '',
+        e.reimbursed ? (e.reimbursed_by_name || '') : '',
+        e.reimbursed ? fmtDate(e.reimbursed_at) : '',
+      ]);
+    });
+
+    // Totals footer row
+    rows.push([
+      '', '', '', '', `${displayed.length} records`, '', '', 'TOTAL',
+      BDT(totals.total),
+      `${displayed.filter(e => e.reimbursed).length} reimbursed / ${displayed.filter(e => !e.reimbursed).length} pending`,
+      '', '', '',
+    ]);
+    rows.push([]);
+
+    // ── Footer ───────────────────────────────────────────────────────────────
+    rows.push(['ResearchTrack v2.0', 'FGS · Daffodil International University', 'Developed by Tariqul Islam', '© 2025', '', '', '', '', '']);
+
+    const csv = '\uFEFF' + rows.map(r => (r.length ? r.map(escape).join(',') : '')).join('\r\n');
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `Expenses-Report-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
   };
 
@@ -242,7 +337,7 @@ export default function Expenses() {
                       <td className="td-date">{fmtDate(e.expense_date)}</td>
                       <td>
                         <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.project_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
                       </td>
                       <td>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{e.submitted_by_name}</div>
