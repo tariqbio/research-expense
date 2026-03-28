@@ -58,8 +58,10 @@ CREATE TABLE IF NOT EXISTS expenses (
                     'printing_stationery',
                     'field_work',
                     'communication',
+                    'other',
                     'miscellaneous'
                   )),
+  other_label     VARCHAR(150),
   description     TEXT NOT NULL,
   amount          NUMERIC(14,2) NOT NULL,
   expense_date    DATE NOT NULL,
@@ -90,9 +92,18 @@ CREATE TABLE IF NOT EXISTS audit_log (
 -- Seed: Create default admin account
 -- Email: admin@fgs.diu.edu  |  Password: Admin@1234 (CHANGE THIS)
 -- ============================================================
+-- ============================================================
+-- Migration: Run these if upgrading an existing database
+-- ============================================================
+-- ALTER TABLE expenses ADD COLUMN IF NOT EXISTS other_label VARCHAR(150);
+-- ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_category_check;
+-- ALTER TABLE expenses ADD CONSTRAINT expenses_category_check
+--   CHECK (category IN ('transportation','printing_stationery','field_work','communication','other','miscellaneous'));
+-- UPDATE users SET name = 'Tariq' WHERE email = 'admin@fgs.diu.edu' AND name = 'FGS Admin';
+
 INSERT INTO users (name, email, password, role)
 VALUES (
-  'FGS Admin',
+  'Tariq',
   'admin@fgs.diu.edu',
   '$2b$10$0l1bqXWDrj/duFYGI2hLF.t4HAd.OYe/aVyHGUm/HHHPrAynLxqGy', -- Admin@1234
   'admin'

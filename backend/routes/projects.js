@@ -218,4 +218,62 @@ router.patch('/:id/installments/:iid', authenticate, adminOnly, async (req, res)
   }
 });
 
+// DELETE /api/projects/:id — admin deletes project (cascading)
+router.delete('/:id', authenticate, adminOnly, async (req, res) => {
+  const { id } = req.params;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Delete all expenses for this project
+    await client.query('DELETE FROM expenses WHERE project_id = $1', [id]);
+    // Delete all project members
+    await client.query('DELETE FROM project_members WHERE project_id = $1', [id]);
+    // Delete all fund installments
+    await client.query('DELETE FROM fund_installments WHERE project_id = $1', [id]);
+    // Delete the project
+    await client.query('DELETE FROM projects WHERE id = $1', [id]);
+    // Log audit
+    await client.query(
+      `INSERT INTO audit_log (table_name, record_id, action, changed_by, new_value, changed_at)
+       VALUES ('projects', $1, 'deleted', $2, $3, NOW())`,
+      [id, req.user.id, JSON.stringify({ id, deleted_by: req.user.id })]
+    );
+    await client.query('COMMIT');
+    res.json({ message: 'Project deleted successfully' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// PATCH /api/projects/bulk/status — bulk update project status
+router.patch('/bulk/status', authenticate, adminOnly, async (req, res) => {
+  const { project_ids, status } = req.body;
+  if (!Array.isArray(project_ids) || !status) {
+    return res.status(400).json({ error: 'project_ids array and status required' });
+  }
+  try {
+    const placeholders = project_ids.map((_, i) => `$${i + 1}`).join(',');
+    await pool.query(
+      `UPDATE projects SET status = $${project_ids.length + 1} WHERE id IN (${placeholders})`,
+      [...project_ids, status]
+    );
+    // Log each update
+    for (const pid of project_ids) {
+      await pool.query(
+        `INSERT INTO audit_log (table_name, record_id, action, changed_by, new_value, changed_at)
+         VALUES ('projects', $1, 'bulk_status_update', $2, $3, NOW())`,
+        [pid, req.user.id, JSON.stringify({ status })]
+      );
+    }
+    res.json({ message: `Updated ${project_ids.length} projects` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;
