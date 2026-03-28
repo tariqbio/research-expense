@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
-import { exportExpensesXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -78,7 +77,18 @@ export default function Expenses() {
   });
 
   const handleExportCSV = () => {
-    exportExpensesXlsx({ displayed, totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS });
+    const headers = ['Date', 'Project', 'Member', 'Category', 'Description', 'Amount', 'Status', 'Reimbursed From'];
+    const rows = displayed.map(e => [
+      fmtDate(e.expense_date), e.project_code, e.submitted_by_name,
+      e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category),
+      `"${e.description}"`, Number(e.amount).toFixed(2),
+      e.reimbursed ? 'Reimbursed' : 'Pending', e.reimbursed_from || '',
+    ]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    a.download = `expenses-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
   };
 
   const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category);
@@ -96,7 +106,7 @@ export default function Expenses() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
           <div className="export-bar">
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export CSV</button>
             <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
           </div>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>
@@ -232,7 +242,7 @@ export default function Expenses() {
                       <td className="td-date">{fmtDate(e.expense_date)}</td>
                       <td>
                         <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.project_name}</div>
                       </td>
                       <td>
                         <div style={{ fontWeight: 600, fontSize: 13 }}>{e.submitted_by_name}</div>
@@ -248,15 +258,13 @@ export default function Expenses() {
                       {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                       <td className="no-print">
                         <div style={{ display: 'flex', gap: 4 }}>
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏ Edit</button>
+                          {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
+                            <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)' }}
+                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏</button>
                           )}
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}
-                              onClick={() => handleDelete(e.id)}>🗑 Delete</button>
+                          {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
+                            <button className="btn btn-ghost btn-xs" onClick={() => handleDelete(e.id)}
+                              style={{ color: 'var(--danger)' }}>Remove</button>
                           )}
                         </div>
                       </td>

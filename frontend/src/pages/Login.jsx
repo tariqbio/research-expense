@@ -77,24 +77,16 @@ export default function Login() {
 
       {/* Form panel */}
       <div className="login-panel">
-        {/* Mobile-only hero strip — replaces the full desktop hero */}
-        <div className="mobile-login-hero-strip">
-          <div className="m-eyebrow">Daffodil International University · FGS</div>
-          <div className="m-headline">
-            Research<br /><span>Expense</span><br />Tracker
-          </div>
-          <p className="m-desc">
-            A unified platform for managing research project budgets, expense submissions,
-            and reimbursement tracking across all FGS research initiatives.
-          </p>
-          <div className="m-stats">
-            <div className="m-stat"><div className="m-stat-val">100%</div><div className="m-stat-lbl">Audit Trail</div></div>
-            <div className="m-stat"><div className="m-stat-val">Live</div><div className="m-stat-lbl">Budget View</div></div>
-            <div className="m-stat"><div className="m-stat-val">Secure</div><div className="m-stat-lbl">Role-based</div></div>
+        <div className="login-logo">R</div>
+
+        {/* Mobile-only hero info banner */}
+        <div className="mobile-hero-banner">
+          <span style={{ fontSize: 22 }}>🎓</span>
+          <div>
+            <strong style={{ color: 'rgba(255,255,255,0.75)', display: 'block', marginBottom: 2 }}>FGS Research Expense Tracker</strong>
+            Daffodil International University · Faculty of Graduate Studies
           </div>
         </div>
-
-        <div className="login-logo">R</div>
 
         <h1>Welcome back</h1>
         <p className="tagline">

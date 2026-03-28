@@ -6,7 +6,6 @@ import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -80,333 +79,226 @@ export default function ProjectDetail() {
     } catch(e) { alert('Failed to update installment.'); }
   };
 
-  // ── XLSX Export ─────────────────────────────────────────────────────────────
+  // ── CSV Export (proper formatted report) ────────────────────────────────
   const handleExportCSV = () => {
     if (!project) return;
-    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
+    const lines = [];
+    // Header block
+    lines.push(`"PROJECT EXPENSE REPORT"`);
+    lines.push(`"Project Code","${project.code}"`);
+    lines.push(`"Project Title","${project.name}"`);
+    lines.push(`"Status","${project.status}"`);
+    lines.push(`"Payment Type","${project.payment_type}"`);
+    lines.push(`"Total Budget","${Number(project.total_budget).toFixed(2)}"`);
+    lines.push(`"Total Spent","${Number(stats.total_spent||0).toFixed(2)}"`);
+    lines.push(`"Reimbursed","${Number(stats.total_reimbursed||0).toFixed(2)}"`);
+    lines.push(`"Pending","${Number(stats.total_pending||0).toFixed(2)}"`);
+    lines.push(`"Report Generated","${new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}"`);
+    lines.push('');
+    // Expense records
+    lines.push(`"EXPENSE RECORDS"`);
+    lines.push(['Date','Researcher','Category','Description','Amount (BDT)','Status','Paid By','Receipt Note'].join(','));
+    expenses.forEach(e => {
+      lines.push([
+        `"${fmtDate(e.expense_date)}"`,
+        `"${e.submitted_by_name}"`,
+        `"${getCatLabel(e)}"`,
+        `"${e.description}"`,
+        Number(e.amount).toFixed(2),
+        e.reimbursed ? 'Reimbursed' : 'Pending',
+        e.reimbursed ? `"${e.reimbursed_by_name||''}"` : '""',
+        `"${e.receipt_note||''}"`,
+      ].join(','));
+    });
+    lines.push('');
+    // Installments
+    if (project.installments.length > 0) {
+      lines.push(`"FUND INSTALLMENTS"`);
+      lines.push(['Expected Date','Amount (BDT)','Status','Received Date','Note'].join(','));
+      project.installments.forEach(i => {
+        lines.push([
+          `"${fmtDate(i.expected_date)}"`,
+          Number(i.amount).toFixed(2),
+          i.status === 'received' ? 'Received' : 'Pending',
+          `"${fmtDate(i.received_date)}"`,
+          `"${i.note||''}"`,
+        ].join(','));
+      });
+      lines.push('');
+    }
+    // Members
+    lines.push(`"PROJECT MEMBERS"`);
+    lines.push(['Name','Email','Role','Total Submitted','Reimbursed','Pending'].join(','));
+    project.members.forEach(m => {
+      const me = expenses.filter(e => e.submitted_by === m.id);
+      const mS = me.reduce((a,e) => a + Number(e.amount), 0);
+      const mP = me.filter(e => e.reimbursed).reduce((a,e) => a + Number(e.amount), 0);
+      lines.push([
+        `"${m.name}"`, `"${m.email}"`, `"${m.role}"`,
+        mS.toFixed(2), mP.toFixed(2), (mS-mP).toFixed(2)
+      ].join(','));
+    });
+
+    const csv = lines.join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = `${project.code}-Report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
   };
 
-  // ── Print — proper A4 PDF report in a new tab ───────────────────────────
+  // ── Print full project report ────────────────────────────────────────────
   const handlePrint = () => {
     if (!project) return;
-    const BDT = n => '&#2547;' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
-    const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    const fmtBDT = n => '৳' + Number(n||0).toLocaleString('en-BD', { minimumFractionDigits:2 });
+    const now = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-    const totalSpent   = Number(stats.total_spent || 0);
-    const totalReimb   = Number(stats.total_reimbursed || 0);
-    const totalPending = Number(stats.total_pending || 0);
-    const budget       = Number(project.total_budget || 0);
-    const remaining    = budget - totalSpent;
-    const pct          = budget > 0 ? Math.min(100, (totalSpent / budget) * 100).toFixed(1) : '0.0';
-
-    const expRows = expenses.map((e, i) => `
-      <tr class="${i % 2 === 0 ? 'even' : ''}">
+    const expRows = expenses.map(e => `
+      <tr>
         <td>${fmtDate(e.expense_date)}</td>
         <td>${e.submitted_by_name}</td>
-        <td><span class="cat-badge">${getCatLabel(e)}</span></td>
-        <td>${e.description}${e.receipt_note ? `<div class="sub">${e.receipt_note}</div>` : ''}</td>
-        <td class="num">${BDT(e.amount)}</td>
-        <td class="${e.reimbursed ? 'status-ok' : 'status-pend'}">${e.reimbursed ? '&#10003; Reimbursed' : 'Pending'}</td>
+        <td>${getCatLabel(e)}</td>
+        <td>${e.description}${e.receipt_note ? `<br><small>${e.receipt_note}</small>` : ''}</td>
+        <td style="text-align:right;font-weight:600">${fmtBDT(e.amount)}</td>
+        <td><span style="color:${e.reimbursed?'#16a34a':'#d97706'};font-weight:600">${e.reimbursed ? '✓ Reimbursed' : 'Pending'}</span></td>
       </tr>`).join('');
 
-    const instRows = project.installments.length > 0
-      ? project.installments.map((inst, i) => `
-        <tr class="${i % 2 === 0 ? 'even' : ''}">
-          <td>#${i + 1}</td>
-          <td>${fmtDate(inst.expected_date)}</td>
-          <td class="num">${BDT(inst.amount)}</td>
-          <td class="${inst.status === 'received' ? 'status-ok' : 'status-pend'}">${inst.status === 'received' ? '&#10003; Received' : 'Pending'}</td>
-          <td>${inst.received_date ? fmtDate(inst.received_date) : '—'}</td>
-          <td>${inst.note || '—'}</td>
-        </tr>`).join('')
-      : '<tr><td colspan="6" class="empty">No installments recorded</td></tr>';
+    const instRows = project.installments.map(i => `
+      <tr>
+        <td>${fmtDate(i.expected_date)}</td>
+        <td style="text-align:right;font-weight:600">${fmtBDT(i.amount)}</td>
+        <td><span style="color:${i.status==='received'?'#16a34a':'#d97706'};font-weight:600">${i.status==='received'?'✓ Received':'Pending'}</span></td>
+        <td>${fmtDate(i.received_date)}</td>
+        <td>${i.note||'—'}</td>
+      </tr>`).join('');
 
-    const memberRows = project.members.map((m, i) => {
+    const memberRows = project.members.map(m => {
       const me = expenses.filter(e => e.submitted_by === m.id);
-      const mS = me.reduce((a, e) => a + Number(e.amount), 0);
-      const mP = me.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
-      return `<tr class="${i % 2 === 0 ? 'even' : ''}">
+      const mS = me.reduce((a,e)=>a+Number(e.amount),0);
+      const mP = me.filter(e=>e.reimbursed).reduce((a,e)=>a+Number(e.amount),0);
+      return `<tr>
         <td><strong>${m.name}</strong></td>
-        <td class="sub-text">${m.email}</td>
+        <td>${m.email}</td>
         <td>${m.role}</td>
-        <td class="num">${me.length}</td>
-        <td class="num">${BDT(mS)}</td>
-        <td class="num status-ok">${BDT(mP)}</td>
-        <td class="num ${mS - mP > 0 ? 'status-pend' : ''}">${BDT(mS - mP)}</td>
+        <td style="text-align:right">${fmtBDT(mS)}</td>
+        <td style="text-align:right;color:#16a34a">${fmtBDT(mP)}</td>
+        <td style="text-align:right;color:#d97706">${fmtBDT(mS-mP)}</td>
       </tr>`;
     }).join('');
 
     const html = `<!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
-<title>${project.code} — Expense Report</title>
+<title>${project.code} — Project Report</title>
 <style>
-  @page {
-    size: A4 portrait;
-    margin: 18mm 16mm 18mm 16mm;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html {
-    /* Force desktop-equivalent rendering width on all devices */
-    min-width: 700px;
-  }
-  body {
-    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
-    font-size: 10pt;
-    color: #1a1a1a;
-    background: #fff;
-    line-height: 1.45;
-    min-width: 700px;
-    width: 100%;
-  }
-
-  /* ── Header ── */
-  .header {
-    display: flex !important;
-    flex-direction: row !important;
-    align-items: flex-start;
-    justify-content: space-between;
-    padding-bottom: 14px;
-    margin-bottom: 18px;
-    border-bottom: 3pt solid #28e98c;
-  }
-  .header-left { flex: 1; min-width: 0; }
-  .inst-name {
-    font-size: 8pt;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #28a870;
-    margin-bottom: 6px;
-  }
-  .proj-code {
-    display: inline-block;
-    background: #e8fff4;
-    color: #0d7a4e;
-    border: 1pt solid #a7f3d0;
-    border-radius: 4pt;
-    padding: 2pt 7pt;
-    font-size: 8pt;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    margin-bottom: 6px;
-  }
-  .proj-title { font-size: 15pt; font-weight: 800; color: #0d1f17; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 4px; }
-  .proj-desc { font-size: 8.5pt; color: #555; margin-top: 3px; }
-  .header-right { text-align: right; padding-left: 20px; }
-  .logo-box {
-    width: 46pt; height: 46pt;
-    background: #0d1f17;
-    border-radius: 8pt;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22pt; font-weight: 900; color: #28e98c;
-    margin-bottom: 5px;
-    margin-left: auto;
-  }
-  .report-date { font-size: 7.5pt; color: #888; }
-
-  /* ── Summary cards ── */
-  .summary-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr) !important;
-    gap: 7px;
-    margin-bottom: 18px;
-    min-width: 0;
-  }
-  .sum-card {
-    background: #f8fffe;
-    border: 1pt solid #d1fae5;
-    border-radius: 5pt;
-    padding: 8pt 9pt;
-    text-align: center;
-  }
-  .sum-label { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #888; margin-bottom: 3pt; }
-  .sum-val { font-size: 11pt; font-weight: 800; color: #0d1f17; line-height: 1; }
-  .sum-val.green { color: #16a34a; }
-  .sum-val.amber { color: #d97706; }
-  .sum-val.red   { color: #dc2626; }
-  .sum-val.blue  { color: #0891b2; }
-
-  /* ── Progress bar ── */
-  .progress-wrap { margin-bottom: 18px; }
-  .progress-label { display: flex; justify-content: space-between; font-size: 7.5pt; color: #666; margin-bottom: 4pt; }
-  .progress-bar { height: 7pt; background: #e5e7eb; border-radius: 4pt; overflow: hidden; }
-  .progress-fill { height: 100%; border-radius: 4pt; background: ${pct > 90 ? '#dc2626' : pct > 70 ? '#d97706' : '#28e98c'}; width: ${pct}%; }
-
-  /* ── Section title ── */
-  .section { margin-bottom: 20px; page-break-inside: avoid; }
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: 8pt;
-    margin-bottom: 8px;
-    padding-bottom: 5px;
-    border-bottom: 1.5pt solid #e5e7eb;
-  }
-  .section-title { font-size: 9pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: #0d1f17; }
-  .section-count { font-size: 7.5pt; background: #f3f4f6; color: #6b7280; padding: 1pt 6pt; border-radius: 20pt; font-weight: 600; }
-
-  /* ── Tables ── */
-  table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
-  thead tr { background: #0d1f17; }
-  thead th { padding: 6pt 8pt; font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #fff; text-align: left; }
-  thead th.num { text-align: right; }
-  tbody td { padding: 5.5pt 8pt; border-bottom: 0.5pt solid #f0f0f0; vertical-align: middle; }
-  tbody tr.even td { background: #fafafa; }
-  tbody tr:hover td { background: #f0fff8; }
-  tfoot td { padding: 6pt 8pt; background: #f0fff8; font-weight: 700; border-top: 1.5pt solid #d1fae5; font-size: 8.5pt; }
-  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .sub { font-size: 7pt; color: #9ca3af; margin-top: 1pt; }
-  .sub-text { font-size: 7.5pt; color: #6b7280; }
-  .empty { text-align: center; color: #9ca3af; padding: 14pt; font-style: italic; }
-  .cat-badge { background: #e8fff4; color: #0d7a4e; border: 0.5pt solid #a7f3d0; border-radius: 3pt; padding: 1pt 5pt; font-size: 7pt; white-space: nowrap; }
-  .status-ok   { color: #16a34a; font-weight: 600; white-space: nowrap; }
-  .status-pend { color: #d97706; font-weight: 600; white-space: nowrap; }
-
-  /* ── Footer ── */
-  .report-footer {
-    margin-top: 20px;
-    padding-top: 10px;
-    border-top: 0.5pt solid #e5e7eb;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
-    justify-content: space-between;
-    font-size: 7pt;
-    color: #aaa;
-  }
-
-  /* ── Print safety ── */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #111; background: white; padding: 32px; }
+  .report-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 3px solid #28e98c; padding-bottom: 16px; }
+  .report-title h1 { font-size: 22px; font-weight: 800; color: #0d1f17; letter-spacing: -0.03em; }
+  .report-title p { font-size: 11px; color: #666; margin-top: 4px; }
+  .report-logo { font-size: 32px; font-weight: 900; color: #28e98c; letter-spacing: -0.05em; }
+  .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+  .meta-card { background: #f8fffe; border: 1px solid #d1fae5; border-radius: 8px; padding: 12px 16px; }
+  .meta-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #666; margin-bottom: 4px; }
+  .meta-value { font-size: 16px; font-weight: 800; color: #0d1f17; }
+  .meta-value.green { color: #16a34a; }
+  .meta-value.amber { color: #d97706; }
+  .section { margin-bottom: 28px; }
+  .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #0d1f17; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px; }
+  table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+  th { text-align: left; padding: 8px 10px; background: #f9fafb; border-bottom: 2px solid #e5e7eb; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #6b7280; }
+  td { padding: 8px 10px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tfoot td { background: #f9fafb; font-weight: 700; border-top: 2px solid #e5e7eb; }
+  small { color: #9ca3af; font-size: 10px; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between; font-size: 10px; color: #9ca3af; }
   @media print {
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .section { page-break-inside: avoid; }
-    .header { page-break-after: avoid; }
-  }
-
-  /* ── Force desktop layout on mobile screens (prevents reflowing before print) ── */
-  @media screen and (max-width: 900px) {
-    html, body { min-width: 700px !important; }
-    .header { display: flex !important; flex-direction: row !important; }
-    .summary-grid { grid-template-columns: repeat(6, 1fr) !important; }
-    table { font-size: 8pt !important; }
-    thead th { padding: 4pt 5pt !important; }
-    tbody td { padding: 4pt 5pt !important; }
+    body { padding: 16px; }
+    .no-break { page-break-inside: avoid; }
   }
 </style>
 </head>
 <body>
-
-<!-- HEADER -->
-<div class="header">
-  <div class="header-left">
-    <div class="inst-name">Daffodil International University &nbsp;·&nbsp; Faculty of Graduate Studies</div>
-    <div class="proj-code">${project.code}</div>
-    <div class="proj-title">${project.name}</div>
-    ${project.description ? `<div class="proj-desc">${project.description}</div>` : ''}
+<div class="report-header">
+  <div class="report-title">
+    <h1>${project.code} — ${project.name}</h1>
+    <p>Project Expense Report · Generated ${now}</p>
+    <p style="margin-top:4px">Faculty of Graduate Studies · Daffodil International University</p>
   </div>
-  <div class="header-right">
-    <div class="logo-box">R</div>
-    <div class="report-date">Expense Report<br>${today}</div>
+  <div class="report-logo">R</div>
+</div>
+
+<div class="meta-grid">
+  <div class="meta-card">
+    <div class="meta-label">Total Budget</div>
+    <div class="meta-value">${fmtBDT(project.total_budget)}</div>
+  </div>
+  <div class="meta-card">
+    <div class="meta-label">Total Spent</div>
+    <div class="meta-value">${fmtBDT(stats.total_spent)}</div>
+  </div>
+  <div class="meta-card">
+    <div class="meta-label">Remaining</div>
+    <div class="meta-value ${Number(project.total_budget)-Number(stats.total_spent||0) >= 0 ? 'green' : 'amber'}">${fmtBDT(Number(project.total_budget)-Number(stats.total_spent||0))}</div>
+  </div>
+  <div class="meta-card">
+    <div class="meta-label">Reimbursed</div>
+    <div class="meta-value green">${fmtBDT(stats.total_reimbursed)}</div>
+  </div>
+  <div class="meta-card">
+    <div class="meta-label">Pending</div>
+    <div class="meta-value amber">${fmtBDT(stats.total_pending)}</div>
+  </div>
+  <div class="meta-card">
+    <div class="meta-label">Status</div>
+    <div class="meta-value">${project.status.charAt(0).toUpperCase()+project.status.slice(1)}</div>
   </div>
 </div>
 
-<!-- SUMMARY CARDS -->
-<div class="summary-grid">
-  <div class="sum-card"><div class="sum-label">Total Budget</div><div class="sum-val">${BDT(budget)}</div></div>
-  <div class="sum-card"><div class="sum-label">Total Spent</div><div class="sum-val blue">${BDT(totalSpent)}</div></div>
-  <div class="sum-card"><div class="sum-label">Reimbursed</div><div class="sum-val green">${BDT(totalReimb)}</div></div>
-  <div class="sum-card"><div class="sum-label">Pending</div><div class="sum-val amber">${BDT(totalPending)}</div></div>
-  <div class="sum-card"><div class="sum-label">Remaining</div><div class="sum-val ${remaining < 0 ? 'red' : 'green'}">${BDT(remaining)}</div></div>
-  <div class="sum-card"><div class="sum-label">Utilised</div><div class="sum-val ${pct > 90 ? 'red' : pct > 70 ? 'amber' : ''}">${pct}%</div></div>
-</div>
-
-<!-- BUDGET PROGRESS -->
-<div class="progress-wrap">
-  <div class="progress-label"><span>Budget Utilisation</span><span>${BDT(totalSpent)} of ${BDT(budget)}</span></div>
-  <div class="progress-bar"><div class="progress-fill"></div></div>
-</div>
-
-<!-- EXPENSE RECORDS -->
-<div class="section">
-  <div class="section-header">
-    <div class="section-title">Expense Records</div>
-    <div class="section-count">${expenses.length} entries</div>
-  </div>
+<div class="section no-break">
+  <div class="section-title">Expense Records (${expenses.length} entries)</div>
   <table>
-    <thead><tr>
-      <th>Date</th><th>Researcher</th><th>Category</th><th>Description</th>
-      <th class="num">Amount</th><th>Status</th>
-    </tr></thead>
-    <tbody>${expRows || '<tr><td colspan="6" class="empty">No expenses recorded</td></tr>'}</tbody>
+    <thead><tr><th>Date</th><th>Researcher</th><th>Category</th><th>Description</th><th style="text-align:right">Amount</th><th>Status</th></tr></thead>
+    <tbody>${expRows || '<tr><td colspan="6" style="text-align:center;color:#9ca3af;padding:20px">No expenses recorded</td></tr>'}</tbody>
     <tfoot><tr>
-      <td colspan="4">Total &mdash; ${expenses.length} record${expenses.length !== 1 ? 's' : ''}</td>
-      <td class="num">${BDT(totalSpent)}</td>
-      <td><span class="status-ok">${BDT(totalReimb)} paid</span> &nbsp;·&nbsp; <span class="status-pend">${BDT(totalPending)} pending</span></td>
+      <td colspan="4">Total — ${expenses.length} records</td>
+      <td style="text-align:right">${fmtBDT(stats.total_spent)}</td>
+      <td>${fmtBDT(stats.total_reimbursed)} reimbursed · ${fmtBDT(stats.total_pending)} pending</td>
     </tr></tfoot>
   </table>
 </div>
 
 ${project.installments.length > 0 ? `
-<!-- FUND INSTALLMENTS -->
-<div class="section">
-  <div class="section-header">
-    <div class="section-title">Fund Installments</div>
-    <div class="section-count">${project.installments.length} installment${project.installments.length !== 1 ? 's' : ''}</div>
-  </div>
+<div class="section no-break">
+  <div class="section-title">Fund Installments</div>
   <table>
-    <thead><tr><th>#</th><th>Expected Date</th><th class="num">Amount</th><th>Status</th><th>Date Received</th><th>Note</th></tr></thead>
+    <thead><tr><th>Expected Date</th><th style="text-align:right">Amount</th><th>Status</th><th>Received Date</th><th>Note</th></tr></thead>
     <tbody>${instRows}</tbody>
   </table>
 </div>` : ''}
 
-<!-- MEMBER SUMMARY -->
-<div class="section">
-  <div class="section-header">
-    <div class="section-title">Member Summary</div>
-    <div class="section-count">${project.members.length} members</div>
-  </div>
+<div class="section no-break">
+  <div class="section-title">Project Members</div>
   <table>
-    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th class="num">Expenses</th><th class="num">Total</th><th class="num">Reimbursed</th><th class="num">Pending</th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Role</th><th style="text-align:right">Submitted</th><th style="text-align:right">Reimbursed</th><th style="text-align:right">Pending</th></tr></thead>
     <tbody>${memberRows}</tbody>
   </table>
 </div>
 
-<!-- FOOTER -->
-<div class="report-footer">
-  <span>ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University</span>
-  <span>Developed by Tariqul Islam &nbsp;·&nbsp; &copy; 2025 FGS, DIU</span>
+<div class="footer">
+  <span>ResearchTrack v2.0 · FGS, Daffodil International University</span>
+  <span>Developed by Tariqul Islam · © 2025</span>
 </div>
-
-<script>
-  // Auto-print after fonts and layout settle
-  window.addEventListener('load', function() {
-    setTimeout(function() { window.print(); }, 400);
-  });
-</script>
 </body>
 </html>`;
 
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-    const url  = URL.createObjectURL(blob);
-    // Try window.open first; on mobile browsers that block popups,
-    // fall back to a hidden anchor click which bypasses popup blockers.
-    const win  = window.open(url, '_blank');
-    if (!win) {
-      const a = document.createElement('a');
-      a.href = url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
-    }
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.onload = () => { win.print(); };
   };
 
-
-    if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
+  if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
   if (!project) return null;
 
   const stats = project.stats || {};
@@ -450,7 +342,7 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export CSV</button>
           <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           {isAdmin && (
@@ -580,13 +472,11 @@ ${project.installments.length > 0 ? `
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
                         {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                         <td className="no-print">
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {/* Edit — admin can always edit; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                            {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
+                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)' }}
+                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏</button>
                             )}
-                            {/* Mark Paid — admin only, only if not reimbursed */}
                             {isAdmin && !e.reimbursed && (
                               reimbursing === e.id ? (
                                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
@@ -595,17 +485,15 @@ ${project.installments.length > 0 ? `
                                     <option value="university">University</option>
                                     <option value="project">Project</option>
                                   </select>
-                                  <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
-                                  <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
+                                  <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓</button>
+                                  <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>✕</button>
                                 </div>
                               ) : (
-                                <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Mark Paid</button>
+                                <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Pay</button>
                               )
                             )}
-                            {/* Delete — admin can always delete; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)}
-                                style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}>🗑 Delete</button>
+                            {!e.reimbursed && (isAdmin || e.submitted_by === user?.id) && (
+                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)} style={{ color: 'var(--danger)' }}>✕</button>
                             )}
                           </div>
                         </td>
