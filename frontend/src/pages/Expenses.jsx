@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
+import RowActions from '../components/RowActions';
 import { exportExpensesXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
@@ -94,11 +95,12 @@ export default function Expenses() {
             {hasF ? ' · filtered' : ' · all records'}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
-          <div className="export-bar">
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
+        <div className="page-actions no-print">
+          <div className="page-actions-group">
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export CSV</button>
             <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
           </div>
+          <div className="page-actions-divider" />
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>
         </div>
       </div>
@@ -246,19 +248,20 @@ export default function Expenses() {
                       <td className="td-amount">{fmt(e.amount)}</td>
                       <td>{e.reimbursed ? <span className="badge badge-green">✓ Reimbursed</span> : <span className="badge badge-amber">Pending</span>}</td>
                       {isAdmin && <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
-                      <td className="no-print">
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏ Edit</button>
-                          )}
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}
-                              onClick={() => handleDelete(e.id)}>🗑 Delete</button>
-                          )}
-                        </div>
+                      <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
+                        {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                          <RowActions items={[
+                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
+                              label: 'Edit', icon: '✏', className: 'accent',
+                              onClick: () => { setEditExpense(e); setShowModal(true); }
+                            },
+                            { divider: true },
+                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
+                              label: 'Delete', icon: '🗑', className: 'danger',
+                              onClick: () => handleDelete(e.id)
+                            },
+                          ]} />
+                        )}
                       </td>
                     </tr>
                   ))}

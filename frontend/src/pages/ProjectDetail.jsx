@@ -6,6 +6,7 @@ import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import RowActions from '../components/RowActions';
 import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
@@ -476,23 +477,42 @@ ${project.installments.length > 0 ? `
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
-          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
-          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
-          {isAdmin && (
-            <>
+        <div className="page-actions no-print">
+          <div className="page-actions-group">
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export CSV</button>
+            <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print</button>
+          </div>
+          {isAdmin && <div className="page-actions-divider" />}
+          <div className="page-actions-group">
+            <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+            {isAdmin && (
               <button className="btn btn-outline btn-sm"
                 style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                onClick={() => setShowEditProject(true)}>✏ Edit Project</button>
-              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
-            </>
-          )}
+                onClick={() => setShowEditProject(true)}>✏ Edit</button>
+            )}
+            {isAdmin && (
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑</button>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="page-body" ref={printRef}>
         {error && <div className="notice notice-error">⚠ {error}</div>}
+
+        {/* Reimburse confirmation panel */}
+        {reimbursing && (
+          <div className="notice notice-info" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ flex: 1 }}>Mark expense as paid — select funding source:</span>
+            <select className="form-select" style={{ width: 'auto', padding: '6px 10px', fontSize: 13 }}
+              value={reimburseFrom} onChange={e => setReimburseFrom(e.target.value)}>
+              <option value="university">University funds</option>
+              <option value="project">Project funds</option>
+            </select>
+            <button className="btn btn-success btn-sm" onClick={() => handleReimburse(reimbursing)}>✓ Confirm Payment</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setReimbursing(null)}>Cancel</button>
+          </div>
+        )}
 
         <div className="stats-grid">
           <div className="stat-card">
@@ -606,35 +626,22 @@ ${project.installments.length > 0 ? `
                         <td className="td-amount">{fmt(e.amount)}</td>
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
                         {isAdmin && <td style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
-                        <td className="no-print">
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {/* Edit — admin can always edit; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
-                            )}
-                            {/* Mark Paid — admin only, only if not reimbursed */}
-                            {isAdmin && !e.reimbursed && (
-                              reimbursing === e.id ? (
-                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                  <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
-                                    value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
-                                    <option value="university">University</option>
-                                    <option value="project">Project</option>
-                                  </select>
-                                  <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
-                                  <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
-                                </div>
-                              ) : (
-                                <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Mark Paid</button>
-                              )
-                            )}
-                            {/* Delete — admin can always delete; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)}
-                                style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}>🗑 Delete</button>
-                            )}
-                          </div>
+                        <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
+                          <RowActions items={[
+                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
+                              label: 'Edit', icon: '✏', className: 'accent',
+                              onClick: () => { setEditExpense(e); setShowExpModal(true); }
+                            },
+                            isAdmin && !e.reimbursed && {
+                              label: 'Mark Paid', icon: '✓', className: 'success',
+                              onClick: () => { setReimbursing(e.id); setReimburseFrom('university'); }
+                            },
+                            { divider: true },
+                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
+                              label: 'Delete', icon: '🗑', className: 'danger',
+                              onClick: () => handleDeleteExpense(e.id)
+                            },
+                          ]} />
                         </td>
                       </tr>
                     ))}
@@ -710,14 +717,17 @@ ${project.installments.length > 0 ? `
                         </td>
                         <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{inst.note || '—'}</td>
                         {isAdmin && (
-                          <td className="no-print">
-                            <div style={{ display: 'flex', gap: 4 }}>
-                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)' }}
-                                onClick={() => { setEditInstallment(inst); setShowInstModal(true); }}>✏ Edit</button>
-                              {inst.status !== 'received' && (
-                                <button className="btn btn-success btn-xs" onClick={() => handleMarkInst(inst.id)}>✓ Received</button>
-                              )}
-                            </div>
+                          <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
+                            <RowActions items={[
+                              {
+                                label: 'Edit', icon: '✏', className: 'accent',
+                                onClick: () => { setEditInstallment(inst); setShowInstModal(true); }
+                              },
+                              inst.status !== 'received' && {
+                                label: 'Mark Received', icon: '✓', className: 'success',
+                                onClick: () => handleMarkInst(inst.id)
+                              },
+                            ]} />
                           </td>
                         )}
                       </tr>
