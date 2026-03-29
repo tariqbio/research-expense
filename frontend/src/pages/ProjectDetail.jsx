@@ -394,19 +394,22 @@ ${project.installments.length > 0 ? `
 </body>
 </html>`;
 
-    // ── Download as .html file (opens in browser, user can Print → Save as PDF) ──
-    // This bypasses all pop-up blockers and works on desktop + mobile identically.
-    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    // ── Open report in new tab and auto-trigger print dialog ──
+    // The print dialog has "Save as PDF" in every modern browser.
+    // We inject a self-calling window.print() so the user doesn't need Ctrl+P.
+    const htmlWithPrint = html.replace('</body>', '<script>window.onload=function(){window.print();}<\/script></body>');
+    const blob = new Blob([htmlWithPrint], { type: 'text/html;charset=utf-8' });
     const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    const safeName = (project.code || 'report').replace(/[^a-z0-9_-]/gi, '_');
-    a.href     = url;
-    a.download = `${safeName}_expense_report.html`;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    const win  = window.open(url, '_blank');
+    if (!win) {
+      // Pop-up blocked — fallback: direct download of HTML
+      const a = document.createElement('a');
+      const safeName = (project.code || 'report').replace(/[^a-z0-9_-]/gi, '_');
+      a.href = url; a.download = `${safeName}_report.html`;
+      a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
 

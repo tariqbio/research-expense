@@ -185,7 +185,7 @@ export default function ReportModal({ expenses, onClose, onGenerate }) {
             📥 Download XLSX
           </button>
           <button className="btn btn-primary btn-sm" disabled={preview.length === 0} onClick={() => handleGenerate('pdf')}>
-            🖨 Save as PDF <span style={{ fontSize: 10, opacity: 0.6, fontWeight: 400 }}>(print)</span>
+            🖨 Print / Save PDF
           </button>
         </div>
 
