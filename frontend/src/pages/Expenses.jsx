@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
-import RowActions from '../components/RowActions';
+import { exportExpensesXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -27,6 +27,7 @@ export default function Expenses() {
   const [filters, setFilters]   = useState({ project_id: '', user_id: '', reimbursed: '', category: '', from_date: '', to_date: '' });
   const [search, setSearch]     = useState('');
   const [sortBy, setSortBy]     = useState('date_desc');
+  const tableRef = useRef(null);
 
   const load = async () => {
     const params = Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== ''));
@@ -53,6 +54,7 @@ export default function Expenses() {
   const setF = (k, v) => setFilters(f => ({ ...f, [k]: v }));
   const hasF = Object.values(filters).some(v => v !== '') || search;
 
+  // Client-side search + sort
   let displayed = expenses.filter(e => {
     if (!search) return true;
     const q = search.toLowerCase();
@@ -75,140 +77,11 @@ export default function Expenses() {
     return 0;
   });
 
-  const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category);
-
-  const handlePrint = () => {
-    const BDT = n => '&#2547;' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
-    const today = new Date().toLocaleDateString('en-GB', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const activeFilters = [];
-    if (filters.project_id) {
-      const p = projects.find(p => String(p.id) === String(filters.project_id));
-      if (p) activeFilters.push('Project: ' + p.code + ' — ' + p.name);
-    }
-    if (filters.category) activeFilters.push('Category: ' + (CAT_LABELS[filters.category] || filters.category));
-    if (filters.reimbursed === 'true') activeFilters.push('Status: Reimbursed only');
-    if (filters.reimbursed === 'false') activeFilters.push('Status: Pending only');
-    if (filters.from_date) activeFilters.push('From: ' + fmtDate(filters.from_date));
-    if (filters.to_date)   activeFilters.push('To: ' + fmtDate(filters.to_date));
-    if (search) activeFilters.push('Search: "' + search + '"');
-
-    const sourceCol = isAdmin ? '<th>Source</th>' : '';
-    const expRows = displayed.map((e, i) =>
-      '<tr class="' + (i % 2 === 0 ? 'even' : '') + '">' +
-        '<td>' + fmtDate(e.expense_date) + '</td>' +
-        '<td><strong>' + e.submitted_by_name + '</strong>' + (e.reimbursed ? '<div class="sub">Paid ' + fmtDate(e.reimbursed_at) + '</div>' : '') + '</td>' +
-        '<td><span class="cat-badge">' + getCatLabel(e) + '</span></td>' +
-        '<td>' + (e.project_code ? '<span class="proj-code">' + e.project_code + '</span><div class="sub">' + (e.project_name || '') + '</div>' : '—') + '</td>' +
-        '<td>' + e.description + (e.receipt_note ? '<div class="sub">' + e.receipt_note + '</div>' : '') + '</td>' +
-        '<td class="num">' + BDT(e.amount) + '</td>' +
-        '<td class="' + (e.reimbursed ? 'status-ok' : 'status-pend') + '">' + (e.reimbursed ? '&#10003; Reimbursed' : 'Pending') + '</td>' +
-        (isAdmin ? '<td class="sub-text">' + (e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—') + '</td>' : '') +
-      '</tr>'
-    ).join('');
-
-    const html = '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' +
-      '<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">' +
-      '<title>Expense Records — Report</title><style>' +
-      '@page { size: A4 portrait; margin: 18mm 16mm 18mm 16mm; }' +
-      '* { margin: 0; padding: 0; box-sizing: border-box; }' +
-      'html { min-width: 700px; }' +
-      'body { font-family: "Segoe UI","Helvetica Neue",Arial,sans-serif; font-size: 10pt; color: #1a1a1a; background: #fff; line-height: 1.45; min-width: 700px; width: 100%; }' +
-      '.header { display: flex !important; flex-direction: row !important; align-items: flex-start; justify-content: space-between; padding-bottom: 14px; margin-bottom: 18px; border-bottom: 3pt solid #28e98c; }' +
-      '.header-left { flex: 1; min-width: 0; }' +
-      '.inst-name { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #28a870; margin-bottom: 6px; }' +
-      '.page-title { font-size: 15pt; font-weight: 800; color: #0d1f17; letter-spacing: -0.02em; line-height: 1.1; margin-bottom: 4px; }' +
-      '.filter-note { font-size: 8pt; color: #6b7280; margin-top: 4px; }' +
-      '.header-right { text-align: right; padding-left: 20px; }' +
-      '.logo-box { width: 46pt; height: 46pt; background: #0d1f17; border-radius: 8pt; display: flex; align-items: center; justify-content: center; font-size: 22pt; font-weight: 900; color: #28e98c; margin-bottom: 5px; margin-left: auto; }' +
-      '.report-date { font-size: 7.5pt; color: #888; }' +
-      '.summary-grid { display: grid; grid-template-columns: repeat(3, 1fr) !important; gap: 8px; margin-bottom: 18px; }' +
-      '.sum-card { background: #f8fffe; border: 1pt solid #d1fae5; border-radius: 5pt; padding: 8pt 9pt; text-align: center; }' +
-      '.sum-label { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #888; margin-bottom: 3pt; }' +
-      '.sum-val { font-size: 11pt; font-weight: 800; color: #0d1f17; line-height: 1; }' +
-      '.sum-val.green { color: #16a34a; } .sum-val.amber { color: #d97706; } .sum-val.blue { color: #0891b2; }' +
-      '.section { margin-bottom: 20px; page-break-inside: avoid; }' +
-      '.section-header { display: flex; align-items: center; gap: 8pt; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1.5pt solid #e5e7eb; }' +
-      '.section-title { font-size: 9pt; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: #0d1f17; }' +
-      '.section-count { font-size: 7.5pt; background: #f3f4f6; color: #6b7280; padding: 1pt 6pt; border-radius: 20pt; font-weight: 600; }' +
-      'table { width: 100%; border-collapse: collapse; font-size: 8.5pt; }' +
-      'thead tr { background: #0d1f17; }' +
-      'thead th { padding: 6pt 8pt; font-size: 7pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: #fff; text-align: left; }' +
-      'thead th.num { text-align: right; }' +
-      'tbody td { padding: 5.5pt 8pt; border-bottom: 0.5pt solid #f0f0f0; vertical-align: middle; }' +
-      'tbody tr.even td { background: #fafafa; }' +
-      'tfoot td { padding: 6pt 8pt; background: #f0fff8; font-weight: 700; border-top: 1.5pt solid #d1fae5; font-size: 8.5pt; }' +
-      '.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }' +
-      '.sub { font-size: 7pt; color: #9ca3af; margin-top: 1pt; }' +
-      '.sub-text { font-size: 7.5pt; color: #6b7280; }' +
-      '.cat-badge { background: #e8fff4; color: #0d7a4e; border: 0.5pt solid #a7f3d0; border-radius: 3pt; padding: 1pt 5pt; font-size: 7pt; white-space: nowrap; }' +
-      '.proj-code { background: #e8fff4; color: #0d7a4e; border: 0.5pt solid #a7f3d0; border-radius: 3pt; padding: 1pt 5pt; font-size: 7pt; font-weight: 700; }' +
-      '.status-ok { color: #16a34a; font-weight: 600; white-space: nowrap; }' +
-      '.status-pend { color: #d97706; font-weight: 600; white-space: nowrap; }' +
-      '.empty { text-align: center; color: #9ca3af; padding: 14pt; font-style: italic; }' +
-      '.report-footer { margin-top: 20px; padding-top: 10px; border-top: 0.5pt solid #e5e7eb; display: flex !important; flex-direction: row !important; justify-content: space-between; font-size: 7pt; color: #aaa; }' +
-      '@media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } .section { page-break-inside: avoid; } }' +
-      '@media screen and (max-width: 900px) { html, body { min-width: 700px !important; } .header { display: flex !important; flex-direction: row !important; } }' +
-      '</style></head><body>' +
-
-      '<div class="header"><div class="header-left">' +
-        '<div class="inst-name">Daffodil International University &nbsp;&middot;&nbsp; Faculty of Graduate Studies</div>' +
-        '<div class="page-title">Expense Records</div>' +
-        (activeFilters.length > 0 ? '<div class="filter-note">Filters: ' + activeFilters.join(' &nbsp;&middot;&nbsp; ') + '</div>' : '') +
-      '</div><div class="header-right">' +
-        '<div class="logo-box">R</div>' +
-        '<div class="report-date">Expense Report<br>' + today + '</div>' +
-      '</div></div>' +
-
-      '<div class="summary-grid">' +
-        '<div class="sum-card"><div class="sum-label">Total (Filtered)</div><div class="sum-val blue">' + BDT(totals.total) + '</div></div>' +
-        '<div class="sum-card"><div class="sum-label">Reimbursed</div><div class="sum-val green">' + BDT(totals.reimbursed) + '</div></div>' +
-        '<div class="sum-card"><div class="sum-label">Pending</div><div class="sum-val amber">' + BDT(totals.pending) + '</div></div>' +
-      '</div>' +
-
-      '<div class="section"><div class="section-header">' +
-        '<div class="section-title">Expense Records</div>' +
-        '<div class="section-count">' + displayed.length + ' entries</div>' +
-      '</div><table>' +
-        '<thead><tr><th>Date</th><th>Submitted By</th><th>Category</th><th>Project</th><th>Description</th><th class="num">Amount</th><th>Status</th>' + sourceCol + '</tr></thead>' +
-        '<tbody>' + (expRows || '<tr><td colspan="8" class="empty">No expenses found</td></tr>') + '</tbody>' +
-        '<tfoot><tr>' +
-          '<td colspan="5">Total &mdash; ' + displayed.length + ' record' + (displayed.length !== 1 ? 's' : '') + '</td>' +
-          '<td class="num">' + BDT(totals.total) + '</td>' +
-          '<td colspan="' + (isAdmin ? 2 : 1) + '"><span class="status-ok">' + BDT(totals.reimbursed) + ' paid</span> &nbsp;&middot;&nbsp; <span class="status-pend">' + BDT(totals.pending) + ' pending</span></td>' +
-        '</tr></tfoot>' +
-      '</table></div>' +
-
-      '<div class="report-footer">' +
-        '<span>ResearchTrack v2.0 &nbsp;&middot;&nbsp; Faculty of Graduate Studies, Daffodil International University</span>' +
-        '<span>Developed by Tariqul Islam &nbsp;&middot;&nbsp; &copy; 2025 FGS, DIU</span>' +
-      '</div></body></html>';
-
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (!isMobile) {
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url  = URL.createObjectURL(blob);
-      const win  = window.open(url, '_blank');
-      if (!win) alert('Please allow pop-ups for this site to open the print report.');
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      return;
-    }
-
-    const iframeId = '__rt_print_frame__';
-    let iframe = document.getElementById(iframeId);
-    if (iframe) iframe.remove();
-    iframe = document.createElement('iframe');
-    iframe.id = iframeId;
-    iframe.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:99999;border:none;background:white;overflow:auto;opacity:1';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open(); doc.write(html); doc.close();
-    setTimeout(() => {
-      try { iframe.contentWindow.focus(); iframe.contentWindow.print(); } catch(e) { console.error(e); }
-      setTimeout(() => { if (iframe) iframe.remove(); }, 1500);
-    }, 600);
+  const handleExportCSV = () => {
+    exportExpensesXlsx({ displayed, totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS });
   };
+
+  const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category);
 
   return (
     <>
@@ -221,41 +94,46 @@ export default function Expenses() {
             {hasF ? ' · filtered' : ' · all records'}
           </p>
         </div>
-        <div className="page-actions no-print">
-          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
+          <div className="export-bar">
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+            <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
+          </div>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>
         </div>
       </div>
 
       <div className="page-body">
+        {/* Summary */}
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(3,1fr)', marginBottom: 20 }}>
           <div className="stat-card">
             <div className="stat-top">
-              <div><div className="stat-label">Total (Filtered)</div><div className="stat-value indigo">{fmt(totals.total)}</div></div>
+              <div><div className="stat-label">Total (filtered)</div><div className="stat-value indigo">{fmt(totals.total)}</div></div>
               <div className="stat-icon si-indigo">💳</div>
             </div>
-            <div className="stat-note">{expenses.length} Expense{expenses.length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{expenses.length} expense{expenses.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top">
               <div><div className="stat-label">Reimbursed</div><div className="stat-value green">{fmt(totals.reimbursed)}</div></div>
               <div className="stat-icon si-green">✅</div>
             </div>
-            <div className="stat-note">{expenses.filter(e => e.reimbursed).length} Paid</div>
+            <div className="stat-note">{expenses.filter(e => e.reimbursed).length} paid</div>
           </div>
           <div className="stat-card">
             <div className="stat-top">
               <div><div className="stat-label">Pending</div><div className="stat-value amber">{fmt(totals.pending)}</div></div>
               <div className="stat-icon si-amber">⏳</div>
             </div>
-            <div className="stat-note">{expenses.filter(e => !e.reimbursed).length} Unpaid</div>
+            <div className="stat-note">{expenses.filter(e => !e.reimbursed).length} unpaid</div>
           </div>
         </div>
 
+        {/* Filters */}
         <div className="card no-print" style={{ marginBottom: 20 }}>
           <div className="card-header">
-            <span className="card-title">Filter &amp; Search</span>
-            {hasF && <button className="btn btn-ghost btn-sm" onClick={() => { setFilters({ project_id: '', user_id: '', reimbursed: '', category: '', from_date: '', to_date: '' }); setSearch(''); }}>✕ Clear All</button>}
+            <span className="card-title">Filter & Search</span>
+            {hasF && <button className="btn btn-ghost btn-sm" onClick={() => { setFilters({ project_id: '', user_id: '', reimbursed: '', category: '', from_date: '', to_date: '' }); setSearch(''); }}>✕ Clear all</button>}
           </div>
           <div className="filter-bar">
             <div className="filter-field" style={{ flex: 2 }}>
@@ -266,7 +144,7 @@ export default function Expenses() {
             <div className="filter-field">
               <label className="form-label">Project</label>
               <select className="form-select" value={filters.project_id} onChange={e => setF('project_id', e.target.value)}>
-                <option value="">All Projects</option>
+                <option value="">All projects</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </select>
             </div>
@@ -274,7 +152,7 @@ export default function Expenses() {
               <div className="filter-field">
                 <label className="form-label">Member</label>
                 <select className="form-select" value={filters.user_id} onChange={e => setF('user_id', e.target.value)}>
-                  <option value="">All Members</option>
+                  <option value="">All members</option>
                   {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               </div>
@@ -282,7 +160,7 @@ export default function Expenses() {
             <div className="filter-field">
               <label className="form-label">Category</label>
               <select className="form-select" value={filters.category} onChange={e => setF('category', e.target.value)}>
-                <option value="">All Categories</option>
+                <option value="">All categories</option>
                 {Object.entries(CAT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
@@ -290,8 +168,8 @@ export default function Expenses() {
               <label className="form-label">Status</label>
               <select className="form-select" value={filters.reimbursed} onChange={e => setF('reimbursed', e.target.value)}>
                 <option value="">All</option>
-                <option value="false">Pending Only</option>
-                <option value="true">Reimbursed Only</option>
+                <option value="false">Pending only</option>
+                <option value="true">Reimbursed only</option>
               </select>
             </div>
             <div className="filter-field">
@@ -305,10 +183,10 @@ export default function Expenses() {
             <div className="filter-field">
               <label className="form-label">Sort By</label>
               <select className="form-select" value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                <option value="date_desc">Newest First</option>
-                <option value="date_asc">Oldest First</option>
-                <option value="amount_desc">Highest Amount</option>
-                <option value="amount_asc">Lowest Amount</option>
+                <option value="date_desc">Newest first</option>
+                <option value="date_asc">Oldest first</option>
+                <option value="amount_desc">Highest amount</option>
+                <option value="amount_asc">Lowest amount</option>
                 <option value="name">Member A–Z</option>
                 <option value="project">Project A–Z</option>
               </select>
@@ -316,7 +194,8 @@ export default function Expenses() {
           </div>
         </div>
 
-        <div className="card">
+        {/* Table */}
+        <div className="card" ref={tableRef}>
           <div className="card-header">
             <span className="card-title">Expense Records</span>
             <span className="card-meta">{displayed.length} entries</span>
@@ -328,70 +207,67 @@ export default function Expenses() {
           ) : displayed.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">🧾</div>
-              <h4>No Expenses Found</h4>
+              <h4>No expenses found</h4>
               <p>No expense records match the current filters.</p>
             </div>
           ) : (
-              <div className="table-wrap">
+            <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Date</th>
+                    <th>Project</th>
                     <th>Submitted By</th>
                     <th>Category</th>
                     <th>Description</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th>Status</th>
+                    {isAdmin && <th>Source</th>}
                     <th className="no-print"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayed.map(e => (
                     <tr key={e.id}>
-                      <td className="td-date">
-                        <div>{fmtDate(e.expense_date)}</div>
-                        <div style={{ marginTop: 3 }}><span className="td-code">{e.project_code}</span></div>
+                      <td className="td-date">{fmtDate(e.expense_date)}</td>
+                      <td>
+                        <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600 }}>{e.submitted_by_name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
-                        {e.reimbursed && isAdmin && <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{e.reimbursed_from === 'university' ? 'University' : 'Project'}</div>}
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{e.submitted_by_name}</div>
+                        {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid {fmtDate(e.reimbursed_at)}</div>}
                       </td>
                       <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
-                      <td style={{ minWidth: 160 }}>
-                        <div style={{ fontWeight: 500 }}>{e.description}</div>
-                        {e.receipt_note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{e.receipt_note}</div>}
+                      <td style={{ maxWidth: 220 }}>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
+                        {e.receipt_note && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{e.receipt_note}</div>}
                       </td>
                       <td className="td-amount">{fmt(e.amount)}</td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        {e.reimbursed
-                          ? <span className="badge badge-green">✓ Paid</span>
-                          : <span className="badge badge-amber">Pending</span>}
-                        {e.reimbursed && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>Paid {fmtDate(e.reimbursed_at)}</div>}
-                      </td>
-                      <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
-                        {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                          <RowActions items={[
-                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
-                              label: 'Edit', icon: '✏', className: 'accent',
-                              onClick: () => { setEditExpense(e); setShowModal(true); }
-                            },
-                            { divider: true },
-                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
-                              label: 'Delete', icon: '🗑', className: 'danger',
-                              onClick: () => handleDelete(e.id)
-                            },
-                          ]} />
-                        )}
+                      <td>{e.reimbursed ? <span className="badge badge-green">✓ Reimbursed</span> : <span className="badge badge-amber">Pending</span>}</td>
+                      {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
+                      <td className="no-print">
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                            <button className="btn btn-ghost btn-xs"
+                              style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
+                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏ Edit</button>
+                          )}
+                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                            <button className="btn btn-ghost btn-xs"
+                              style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}
+                              onClick={() => handleDelete(e.id)}>🗑 Delete</button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={4} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} records</td>
+                    <td colSpan={isAdmin ? 5 : 5} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} records</td>
                     <td className="td-amount">{fmt(totals.total)}</td>
-                    <td colSpan={2}>
+                    <td colSpan={isAdmin ? 3 : 2}>
                       <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(totals.reimbursed)}</span>
                       <span style={{ color: 'var(--text-tertiary)', margin: '0 8px' }}>·</span>
                       <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totals.pending)} pending</span>

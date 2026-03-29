@@ -6,8 +6,7 @@ import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
-import RowActions from '../components/RowActions';
-
+import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -81,7 +80,11 @@ export default function ProjectDetail() {
     } catch(e) { alert('Failed to update installment.'); }
   };
 
-
+  // ── XLSX Export ─────────────────────────────────────────────────────────────
+  const handleExportCSV = () => {
+    if (!project) return;
+    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
+  };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
   const handlePrint = () => {
@@ -137,7 +140,7 @@ export default function ProjectDetail() {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${project.code} — Expense Report</title>
 <style>
   @page {
@@ -145,31 +148,24 @@ export default function ProjectDetail() {
     margin: 18mm 16mm 18mm 16mm;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html {
-    /* Force desktop-equivalent rendering width on all devices */
-    min-width: 700px;
-  }
   body {
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
     font-size: 10pt;
     color: #1a1a1a;
     background: #fff;
     line-height: 1.45;
-    min-width: 700px;
-    width: 100%;
   }
 
   /* ── Header ── */
   .header {
-    display: flex !important;
-    flex-direction: row !important;
+    display: flex;
     align-items: flex-start;
     justify-content: space-between;
     padding-bottom: 14px;
     margin-bottom: 18px;
     border-bottom: 3pt solid #28e98c;
   }
-  .header-left { flex: 1; min-width: 0; }
+  .header-left { flex: 1; }
   .inst-name {
     font-size: 8pt;
     font-weight: 700;
@@ -207,10 +203,9 @@ export default function ProjectDetail() {
   /* ── Summary cards ── */
   .summary-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr) !important;
+    grid-template-columns: repeat(6, 1fr);
     gap: 7px;
     margin-bottom: 18px;
-    min-width: 0;
   }
   .sum-card {
     background: #f8fffe;
@@ -267,9 +262,7 @@ export default function ProjectDetail() {
     margin-top: 20px;
     padding-top: 10px;
     border-top: 0.5pt solid #e5e7eb;
-    display: flex !important;
-    flex-direction: row !important;
-    flex-wrap: nowrap !important;
+    display: flex;
     justify-content: space-between;
     font-size: 7pt;
     color: #aaa;
@@ -280,16 +273,6 @@ export default function ProjectDetail() {
     body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .section { page-break-inside: avoid; }
     .header { page-break-after: avoid; }
-  }
-
-  /* ── Force desktop layout on mobile screens (prevents reflowing before print) ── */
-  @media screen and (max-width: 900px) {
-    html, body { min-width: 700px !important; }
-    .header { display: flex !important; flex-direction: row !important; }
-    .summary-grid { grid-template-columns: repeat(6, 1fr) !important; }
-    table { font-size: 8pt !important; }
-    thead th { padding: 4pt 5pt !important; }
-    tbody td { padding: 4pt 5pt !important; }
   }
 </style>
 </head>
@@ -376,57 +359,21 @@ ${project.installments.length > 0 ? `
   <span>Developed by Tariqul Islam &nbsp;·&nbsp; &copy; 2025 FGS, DIU</span>
 </div>
 
+<script>
+  // Auto-print after fonts and layout settle
+  window.addEventListener('load', function() {
+    setTimeout(function() { window.print(); }, 400);
+  });
+</script>
 </body>
 </html>`;
 
-    // ── Universal print ──────────────────────────────────────────────────────
-    // Desktop: open blob in new tab (already working perfectly — don't change)
-    // Mobile:  blob: URLs can't be opened via window.open on iOS/Android.
-    //          Instead we make the iframe FULL-SCREEN so layout renders
-    //          identically to desktop, call print(), then remove it.
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (!isMobile) {
-      // ── Desktop: existing working approach ──
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url  = URL.createObjectURL(blob);
-      const win  = window.open(url, '_blank');
-      if (!win) alert('Please allow pop-ups for this site to open the print report.');
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      return;
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) {
+      alert('Please allow pop-ups for this site to open the print report.');
     }
-
-    // ── Mobile: full-screen iframe so layout = desktop quality ──
-    const iframeId = '__rt_print_frame__';
-    let iframe = document.getElementById(iframeId);
-    if (iframe) iframe.remove();
-
-    iframe = document.createElement('iframe');
-    iframe.id = iframeId;
-    // Full-screen, above everything — makes layout render at full width like desktop
-    iframe.style.cssText = [
-      'position:fixed', 'inset:0', 'width:100vw', 'height:100vh',
-      'z-index:99999', 'border:none', 'background:white',
-      'overflow:auto', 'opacity:1',
-    ].join(';');
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Give fonts and layout time to fully render at full width, then print
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        console.error('iframe print failed:', e);
-      }
-      // Remove iframe after print dialog is dismissed
-      setTimeout(() => { if (iframe) iframe.remove(); }, 1500);
-    }, 600);
   };
 
 
@@ -473,72 +420,54 @@ ${project.installments.length > 0 ? `
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div className="page-actions no-print">
-          <div className="page-actions-group">
-            <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print</button>
-          </div>
-          {isAdmin && <div className="page-actions-divider" />}
-          <div className="page-actions-group">
-            <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
-            {isAdmin && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>⬇ Export XLSX</button>
+          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
+          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+          {isAdmin && (
+            <>
               <button className="btn btn-outline btn-sm"
                 style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                onClick={() => setShowEditProject(true)}>✏ Edit</button>
-            )}
-            {isAdmin && (
-              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑</button>
-            )}
-          </div>
+                onClick={() => setShowEditProject(true)}>✏ Edit Project</button>
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+            </>
+          )}
         </div>
       </div>
 
       <div className="page-body" ref={printRef}>
         {error && <div className="notice notice-error">⚠ {error}</div>}
 
-        {/* Reimburse confirmation panel */}
-        {reimbursing && (
-          <div className="notice notice-info" style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ flex: 1 }}>Mark expense as paid — select funding source:</span>
-            <select className="form-select" style={{ width: 'auto', padding: '6px 10px', fontSize: 13 }}
-              value={reimburseFrom} onChange={e => setReimburseFrom(e.target.value)}>
-              <option value="university">University funds</option>
-              <option value="project">Project funds</option>
-            </select>
-            <button className="btn btn-success btn-sm" onClick={() => handleReimburse(reimbursing)}>✓ Confirm Payment</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => setReimbursing(null)}>Cancel</button>
-          </div>
-        )}
-
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
-            <div className="stat-note">{project.payment_type?.charAt(0).toUpperCase() + project.payment_type?.slice(1)} Payment</div>
+            <div className="stat-note">{project.payment_type} payment</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Funds Received</div><div className="stat-value" style={{ color: 'var(--info)' }}>{fmt(receivedFunds)}</div></div><div className="stat-icon si-teal">🏦</div></div>
             <div className="stat-note">
-              Of {fmt(totalInstalled)} Scheduled
+              of {fmt(totalInstalled)} scheduled
               {totalInstalled > 0 && <span style={{ marginLeft: 6, color: budget - receivedFunds > 0 ? 'var(--warning)' : 'var(--success)' }}>
-                · {fmt(budget - receivedFunds)} Outstanding
+                · {fmt(budget - receivedFunds)} outstanding
               </span>}
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Spent</div><div className="stat-value">{fmt(spent)}</div></div><div className="stat-icon si-blue">📈</div></div>
             <div className="progress"><div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} /></div>
-            <div className="stat-note">{pct.toFixed(1)}% Of Budget</div>
+            <div className="stat-note">{pct.toFixed(1)}% of budget</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Reimbursed</div><div className="stat-value green">{fmt(stats.total_reimbursed)}</div></div><div className="stat-icon si-green">✅</div></div>
-            <div className="stat-note">{reimbursedExp.length} Expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{reimbursedExp.length} expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Pending</div><div className="stat-value amber">{fmt(stats.total_pending)}</div></div><div className="stat-icon si-amber">⏳</div></div>
-            <div className="stat-note">{pendingExp.length} Unpaid</div>
+            <div className="stat-note">{pendingExp.length} unpaid</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Remaining</div><div className={`stat-value ${budget - spent < 0 ? 'red' : 'green'}`}>{fmt(budget - spent)}</div></div><div className="stat-icon si-green">📊</div></div>
-            <div className="stat-note">Budget Balance</div>
+            <div className="stat-note">budget balance</div>
           </div>
         </div>
 
@@ -610,33 +539,46 @@ ${project.installments.length > 0 ? `
                       <tr key={e.id}>
                         <td className="td-date">{fmtDate(e.expense_date)}</td>
                         <td style={{ minWidth: 100 }}>
-                          <div style={{ fontWeight: 600, fontSize: 14 }}>{e.submitted_by_name}</div>
-                          {e.reimbursed && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Paid by {e.reimbursed_by_name}</div>}
+                          <div style={{ fontWeight: 600 }}>{e.submitted_by_name}</div>
+                          {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid by {e.reimbursed_by_name}</div>}
                         </td>
                         <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
                         <td style={{ minWidth: 160 }}>
-                          <div style={{ fontSize: 14, fontWeight: 500 }}>{e.description}</div>
-                          {e.receipt_note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{e.receipt_note}</div>}
+                          <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
+                          {e.receipt_note && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{e.receipt_note}</div>}
                         </td>
                         <td className="td-amount">{fmt(e.amount)}</td>
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
-                        {isAdmin && <td style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
-                        <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
-                          <RowActions items={[
-                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
-                              label: 'Edit', icon: '✏', className: 'accent',
-                              onClick: () => { setEditExpense(e); setShowExpModal(true); }
-                            },
-                            isAdmin && !e.reimbursed && {
-                              label: 'Mark Paid', icon: '✓', className: 'success',
-                              onClick: () => { setReimbursing(e.id); setReimburseFrom('university'); }
-                            },
-                            { divider: true },
-                            (isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && {
-                              label: 'Delete', icon: '🗑', className: 'danger',
-                              onClick: () => handleDeleteExpense(e.id)
-                            },
-                          ]} />
+                        {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
+                        <td className="no-print">
+                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                            {/* Edit — admin can always edit; member only if their own & not reimbursed */}
+                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
+                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
+                            )}
+                            {/* Mark Paid — admin only, only if not reimbursed */}
+                            {isAdmin && !e.reimbursed && (
+                              reimbursing === e.id ? (
+                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                  <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
+                                    value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
+                                    <option value="university">University</option>
+                                    <option value="project">Project</option>
+                                  </select>
+                                  <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
+                                  <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
+                                </div>
+                              ) : (
+                                <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Mark Paid</button>
+                              )
+                            )}
+                            {/* Delete — admin can always delete; member only if their own & not reimbursed */}
+                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
+                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)}
+                                style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}>🗑 Delete</button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -662,7 +604,7 @@ ${project.installments.length > 0 ? `
             <div className="card-header">
               <div>
                 <span className="card-title">Fund Installments</span>
-                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
                   Each installment = a portion of the {fmt(budget)} total budget being released. Add multiple installments for staged funding.
                 </div>
               </div>
@@ -674,12 +616,12 @@ ${project.installments.length > 0 ? `
             </div>
 
             {/* Summary bar */}
-            <div style={{ display: 'flex', gap: 24, padding: '14px 20px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Total Budget</div><div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>{fmt(budget)}</div></div>
-              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Scheduled</div><div style={{ fontSize: 16, fontWeight: 800 }}>{fmt(totalInstalled)}</div></div>
-              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Received</div><div style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>{fmt(receivedFunds)}</div></div>
-              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Still Pending</div><div style={{ fontSize: 16, fontWeight: 800, color: 'var(--warning)' }}>{fmt(totalInstalled - receivedFunds)}</div></div>
-              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Unscheduled</div><div style={{ fontSize: 16, fontWeight: 800, color: budget - totalInstalled < 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{fmt(budget - totalInstalled)}</div></div>
+            <div style={{ display: 'flex', gap: 24, padding: '12px 18px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Total Budget</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>{fmt(budget)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Scheduled</div><div style={{ fontSize: 15, fontWeight: 800 }}>{fmt(totalInstalled)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Received</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt(receivedFunds)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Still Pending</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--warning)' }}>{fmt(totalInstalled - receivedFunds)}</div></div>
+              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Unscheduled</div><div style={{ fontSize: 15, fontWeight: 800, color: budget - totalInstalled < 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{fmt(budget - totalInstalled)}</div></div>
             </div>
 
             {project.installments.length === 0 ? (
@@ -700,7 +642,7 @@ ${project.installments.length > 0 ? `
                   <tbody>
                     {project.installments.map((inst, idx) => (
                       <tr key={inst.id}>
-                        <td style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13 }}>#{idx+1}</td>
+                        <td style={{ color: 'var(--text-tertiary)', fontWeight: 700, fontSize: 11 }}>#{idx+1}</td>
                         <td className="td-date">{fmtDate(inst.expected_date)}</td>
                         <td className="td-amount">{fmt(inst.amount)}</td>
                         <td>{inst.status === 'received'
@@ -710,19 +652,16 @@ ${project.installments.length > 0 ? `
                         <td className="td-date" style={{ color: inst.received_date ? 'var(--success)' : 'var(--text-tertiary)' }}>
                           {fmtDate(inst.received_date)}
                         </td>
-                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{inst.note || '—'}</td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{inst.note || '—'}</td>
                         {isAdmin && (
-                          <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
-                            <RowActions items={[
-                              {
-                                label: 'Edit', icon: '✏', className: 'accent',
-                                onClick: () => { setEditInstallment(inst); setShowInstModal(true); }
-                              },
-                              inst.status !== 'received' && {
-                                label: 'Mark Received', icon: '✓', className: 'success',
-                                onClick: () => handleMarkInst(inst.id)
-                              },
-                            ]} />
+                          <td className="no-print">
+                            <div style={{ display: 'flex', gap: 4 }}>
+                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)' }}
+                                onClick={() => { setEditInstallment(inst); setShowInstModal(true); }}>✏ Edit</button>
+                              {inst.status !== 'received' && (
+                                <button className="btn btn-success btn-xs" onClick={() => handleMarkInst(inst.id)}>✓ Received</button>
+                              )}
+                            </div>
                           </td>
                         )}
                       </tr>
@@ -763,7 +702,7 @@ ${project.installments.length > 0 ? `
                     return (
                       <tr key={m.id}>
                         <td style={{ fontWeight: 600 }}>{m.name}</td>
-                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{m.email}</td>
+                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{m.email}</td>
                         <td><span className="badge badge-gray">{m.role}</span></td>
                         <td className="td-amount">{fmt(mS)}</td>
                         <td className="td-amount" style={{ color: 'var(--success)' }}>{fmt(mP)}</td>
