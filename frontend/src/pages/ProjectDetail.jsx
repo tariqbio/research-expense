@@ -394,54 +394,19 @@ ${project.installments.length > 0 ? `
 </body>
 </html>`;
 
-    // ── Universal print ──────────────────────────────────────────────────────
-    // Desktop: open blob in new tab (already working perfectly — don't change)
-    // Mobile:  blob: URLs can't be opened via window.open on iOS/Android.
-    //          Instead we make the iframe FULL-SCREEN so layout renders
-    //          identically to desktop, call print(), then remove it.
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (!isMobile) {
-      // ── Desktop: existing working approach ──
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url  = URL.createObjectURL(blob);
-      const win  = window.open(url, '_blank');
-      if (!win) alert('Please allow pop-ups for this site to open the print report.');
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      return;
-    }
-
-    // ── Mobile: full-screen iframe so layout = desktop quality ──
-    const iframeId = '__rt_print_frame__';
-    let iframe = document.getElementById(iframeId);
-    if (iframe) iframe.remove();
-
-    iframe = document.createElement('iframe');
-    iframe.id = iframeId;
-    // Full-screen, above everything — makes layout render at full width like desktop
-    iframe.style.cssText = [
-      'position:fixed', 'inset:0', 'width:100vw', 'height:100vh',
-      'z-index:99999', 'border:none', 'background:white',
-      'overflow:auto', 'opacity:1',
-    ].join(';');
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Give fonts and layout time to fully render at full width, then print
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        console.error('iframe print failed:', e);
-      }
-      // Remove iframe after print dialog is dismissed
-      setTimeout(() => { if (iframe) iframe.remove(); }, 1500);
-    }, 600);
+    // ── Download as .html file (opens in browser, user can Print → Save as PDF) ──
+    // This bypasses all pop-up blockers and works on desktop + mobile identically.
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const safeName = (project.code || 'report').replace(/[^a-z0-9_-]/gi, '_');
+    a.href     = url;
+    a.download = `${safeName}_expense_report.html`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
 
