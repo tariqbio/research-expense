@@ -333,7 +333,7 @@ body {
 /* ─────────────────────────────────────────────────────────
    STAT CARDS — true glassmorphism in both modes
 ───────────────────────────────────────────────────────── */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 24px; }
 
 .stat-card {
   background: rgba(255,255,255,0.65);
@@ -371,7 +371,7 @@ body {
 
 .stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 
-.stat-icon { width: 44px; height: 44px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.stat-icon { width: 38px; height: 38px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
 
 .si-blue   { background: #eff6ff; }
 .si-indigo { background: var(--accent-light); }
@@ -942,7 +942,7 @@ tbody tr:hover td:last-child {
   .topbar { padding:0 14px; gap: 8px; }
   .topbar-clock { display: none; }
   .form-row { grid-template-columns:1fr; }
-  .stats-grid { grid-template-columns:1fr 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr 1fr; }
   .projects-grid { grid-template-columns: 1fr; }
   .filter-bar { flex-direction: column; gap: 12px; }
   .filter-field { width: 100%; }
@@ -1031,7 +1031,7 @@ tbody tr:hover td:last-child {
    EXTRA NARROW MOBILE (phones < 480px)
 ───────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .stats-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
   .page-title { font-size: 18px; }
   .tabs { padding: 0 12px; overflow-x: auto; flex-wrap: nowrap; }
   .tab-btn { white-space: nowrap; font-size: 12.5px; padding: 10px 10px; }

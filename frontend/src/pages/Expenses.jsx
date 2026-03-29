@@ -332,41 +332,43 @@ export default function Expenses() {
               <p>No expense records match the current filters.</p>
             </div>
           ) : (
-            <div className="table-wrap">
+              <div className="table-wrap">
               <table>
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Project</th>
                     <th>Submitted By</th>
                     <th>Category</th>
                     <th>Description</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th>Status</th>
-                    {isAdmin && <th>Source</th>}
                     <th className="no-print"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayed.map(e => (
                     <tr key={e.id}>
-                      <td className="td-date">{fmtDate(e.expense_date)}</td>
-                      <td>
-                        <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
+                      <td className="td-date">
+                        <div>{fmtDate(e.expense_date)}</div>
+                        <div style={{ marginTop: 3 }}><span className="td-code">{e.project_code}</span></div>
                       </td>
                       <td>
                         <div style={{ fontWeight: 600 }}>{e.submitted_by_name}</div>
-                        {e.reimbursed && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2 }}>Paid {fmtDate(e.reimbursed_at)}</div>}
+                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 2, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
+                        {e.reimbursed && isAdmin && <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 1 }}>{e.reimbursed_from === 'university' ? 'University' : 'Project'}</div>}
                       </td>
                       <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
-                      <td style={{ maxWidth: 220 }}>
+                      <td style={{ minWidth: 160 }}>
                         <div style={{ fontWeight: 500 }}>{e.description}</div>
                         {e.receipt_note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{e.receipt_note}</div>}
                       </td>
                       <td className="td-amount">{fmt(e.amount)}</td>
-                      <td>{e.reimbursed ? <span className="badge badge-green">✓ Reimbursed</span> : <span className="badge badge-amber">Pending</span>}</td>
-                      {isAdmin && <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
+                      <td style={{ whiteSpace: 'nowrap' }}>
+                        {e.reimbursed
+                          ? <span className="badge badge-green">✓ Paid</span>
+                          : <span className="badge badge-amber">Pending</span>}
+                        {e.reimbursed && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>Paid {fmtDate(e.reimbursed_at)}</div>}
+                      </td>
                       <td className="no-print" style={{ width: 40, paddingLeft: 4, paddingRight: 12 }}>
                         {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
                           <RowActions items={[
@@ -387,9 +389,9 @@ export default function Expenses() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={isAdmin ? 5 : 5} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} records</td>
+                    <td colSpan={4} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} records</td>
                     <td className="td-amount">{fmt(totals.total)}</td>
-                    <td colSpan={isAdmin ? 3 : 2}>
+                    <td colSpan={2}>
                       <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(totals.reimbursed)}</span>
                       <span style={{ color: 'var(--text-tertiary)', margin: '0 8px' }}>·</span>
                       <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totals.pending)} pending</span>
