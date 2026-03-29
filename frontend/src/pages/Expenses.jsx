@@ -232,20 +232,20 @@ export default function Expenses() {
                       <td className="td-date">{fmtDate(e.expense_date)}</td>
                       <td>
                         <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
+                        <div style={{ fontSize: 13, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{e.submitted_by_name}</div>
-                        {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid {fmtDate(e.reimbursed_at)}</div>}
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{e.submitted_by_name}</div>
+                        {e.reimbursed && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Paid {fmtDate(e.reimbursed_at)}</div>}
                       </td>
                       <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
                       <td style={{ maxWidth: 220 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
-                        {e.receipt_note && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{e.receipt_note}</div>}
+                        <div style={{ fontSize: 14, fontWeight: 500 }}>{e.description}</div>
+                        {e.receipt_note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{e.receipt_note}</div>}
                       </td>
                       <td className="td-amount">{fmt(e.amount)}</td>
                       <td>{e.reimbursed ? <span className="badge badge-green">✓ Reimbursed</span> : <span className="badge badge-amber">Pending</span>}</td>
-                      {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
+                      {isAdmin && <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                       <td className="no-print">
                         <div style={{ display: 'flex', gap: 4 }}>
                           {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (

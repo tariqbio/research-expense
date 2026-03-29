@@ -595,17 +595,17 @@ ${project.installments.length > 0 ? `
                       <tr key={e.id}>
                         <td className="td-date">{fmtDate(e.expense_date)}</td>
                         <td style={{ minWidth: 100 }}>
-                          <div style={{ fontWeight: 600 }}>{e.submitted_by_name}</div>
-                          {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid by {e.reimbursed_by_name}</div>}
+                          <div style={{ fontWeight: 600, fontSize: 14 }}>{e.submitted_by_name}</div>
+                          {e.reimbursed && <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Paid by {e.reimbursed_by_name}</div>}
                         </td>
                         <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
                         <td style={{ minWidth: 160 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
-                          {e.receipt_note && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{e.receipt_note}</div>}
+                          <div style={{ fontSize: 14, fontWeight: 500 }}>{e.description}</div>
+                          {e.receipt_note && <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 3 }}>{e.receipt_note}</div>}
                         </td>
                         <td className="td-amount">{fmt(e.amount)}</td>
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
-                        {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
+                        {isAdmin && <td style={{ fontSize: 13, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                         <td className="no-print">
                           <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                             {/* Edit — admin can always edit; member only if their own & not reimbursed */}
@@ -660,7 +660,7 @@ ${project.installments.length > 0 ? `
             <div className="card-header">
               <div>
                 <span className="card-title">Fund Installments</span>
-                <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginTop: 4 }}>
                   Each installment = a portion of the {fmt(budget)} total budget being released. Add multiple installments for staged funding.
                 </div>
               </div>
@@ -672,12 +672,12 @@ ${project.installments.length > 0 ? `
             </div>
 
             {/* Summary bar */}
-            <div style={{ display: 'flex', gap: 24, padding: '12px 18px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Total Budget</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--accent)' }}>{fmt(budget)}</div></div>
-              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Scheduled</div><div style={{ fontSize: 15, fontWeight: 800 }}>{fmt(totalInstalled)}</div></div>
-              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Received</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--success)' }}>{fmt(receivedFunds)}</div></div>
-              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Still Pending</div><div style={{ fontSize: 15, fontWeight: 800, color: 'var(--warning)' }}>{fmt(totalInstalled - receivedFunds)}</div></div>
-              <div><div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)' }}>Unscheduled</div><div style={{ fontSize: 15, fontWeight: 800, color: budget - totalInstalled < 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{fmt(budget - totalInstalled)}</div></div>
+            <div style={{ display: 'flex', gap: 24, padding: '14px 20px', background: 'var(--bg-subtle)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
+              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Total Budget</div><div style={{ fontSize: 16, fontWeight: 800, color: 'var(--accent)' }}>{fmt(budget)}</div></div>
+              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Scheduled</div><div style={{ fontSize: 16, fontWeight: 800 }}>{fmt(totalInstalled)}</div></div>
+              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Received</div><div style={{ fontSize: 16, fontWeight: 800, color: 'var(--success)' }}>{fmt(receivedFunds)}</div></div>
+              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Still Pending</div><div style={{ fontSize: 16, fontWeight: 800, color: 'var(--warning)' }}>{fmt(totalInstalled - receivedFunds)}</div></div>
+              <div><div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>Unscheduled</div><div style={{ fontSize: 16, fontWeight: 800, color: budget - totalInstalled < 0 ? 'var(--danger)' : 'var(--text-secondary)' }}>{fmt(budget - totalInstalled)}</div></div>
             </div>
 
             {project.installments.length === 0 ? (
@@ -698,7 +698,7 @@ ${project.installments.length > 0 ? `
                   <tbody>
                     {project.installments.map((inst, idx) => (
                       <tr key={inst.id}>
-                        <td style={{ color: 'var(--text-tertiary)', fontWeight: 700, fontSize: 11 }}>#{idx+1}</td>
+                        <td style={{ color: 'var(--text-secondary)', fontWeight: 700, fontSize: 13 }}>#{idx+1}</td>
                         <td className="td-date">{fmtDate(inst.expected_date)}</td>
                         <td className="td-amount">{fmt(inst.amount)}</td>
                         <td>{inst.status === 'received'
@@ -708,7 +708,7 @@ ${project.installments.length > 0 ? `
                         <td className="td-date" style={{ color: inst.received_date ? 'var(--success)' : 'var(--text-tertiary)' }}>
                           {fmtDate(inst.received_date)}
                         </td>
-                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{inst.note || '—'}</td>
+                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{inst.note || '—'}</td>
                         {isAdmin && (
                           <td className="no-print">
                             <div style={{ display: 'flex', gap: 4 }}>
@@ -758,7 +758,7 @@ ${project.installments.length > 0 ? `
                     return (
                       <tr key={m.id}>
                         <td style={{ fontWeight: 600 }}>{m.name}</td>
-                        <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{m.email}</td>
+                        <td style={{ fontSize: 13, color: 'var(--text-secondary)' }}>{m.email}</td>
                         <td><span className="badge badge-gray">{m.role}</span></td>
                         <td className="td-amount">{fmt(mS)}</td>
                         <td className="td-amount" style={{ color: 'var(--success)' }}>{fmt(mP)}</td>
