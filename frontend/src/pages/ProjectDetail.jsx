@@ -6,10 +6,13 @@ import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ActionMenu from '../components/ActionMenu';
 import { exportProjectXlsx } from '../utils/exportXlsx';
+import ReportModal from '../components/ReportModal';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmtPayType = t => ({ upfront: 'Upfront Payment', end: 'End Payment', installment: 'Installment Payment' }[t] || t);
 
 const CAT_LABELS = { transportation:'Transportation', printing_stationery:'Printing & Stationery', field_work:'Field Work', communication:'Communication', other:'Other', miscellaneous:'Miscellaneous' };
 const CAT_BADGE  = { transportation:'badge-teal', printing_stationery:'badge-indigo', field_work:'badge-green', communication:'badge-amber', other:'badge-gray', miscellaneous:'badge-gray' };
@@ -34,10 +37,13 @@ export default function ProjectDetail() {
   const [reimburseFrom, setReimburseFrom] = useState('university');
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expSearch, setExpSearch] = useState('');
   const [expSort, setExpSort]     = useState('date_desc');
   const [expStatus, setExpStatus] = useState('');
+  const [expFrom, setExpFrom]     = useState('');
+  const [expTo, setExpTo]         = useState('');
 
   const load = async () => {
     try {
@@ -80,26 +86,32 @@ export default function ProjectDetail() {
     } catch(e) { alert('Failed to update installment.'); }
   };
 
+  const displayedExpRef = useRef([]);
+
   // ── XLSX Export ─────────────────────────────────────────────────────────────
-  const handleExportCSV = () => {
+  const handleExportCSV = (expList) => {
     if (!project) return;
-    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
+    exportProjectXlsx({ project, expenses: expList || displayedExpRef.current, stats, getCatLabel, fmtDate });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
-  const handlePrint = () => {
+  const handlePrint = (expList, reportLabel) => {
     if (!project) return;
     const BDT = n => '&#2547;' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
     const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-    const totalSpent   = Number(stats.total_spent || 0);
-    const totalReimb   = Number(stats.total_reimbursed || 0);
-    const totalPending = Number(stats.total_pending || 0);
+    const printExp    = expList || displayedExpRef.current;
+    const totalSpent   = printExp.reduce((a, e) => a + Number(e.amount), 0);
+    const totalReimb   = printExp.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
+    const totalPending = printExp.filter(e => !e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
     const budget       = Number(project.total_budget || 0);
     const remaining    = budget - totalSpent;
     const pct          = budget > 0 ? Math.min(100, (totalSpent / budget) * 100).toFixed(1) : '0.0';
+    const dateRange    = reportLabel || ((expFrom || expTo)
+      ? `${expFrom ? fmtDate(expFrom) : 'Start'} — ${expTo ? fmtDate(expTo) : 'Present'}`
+      : 'All Dates');
 
-    const expRows = expenses.map((e, i) => `
+    const expRows = printExp.map((e, i) => `
       <tr class="${i % 2 === 0 ? 'even' : ''}">
         <td>${fmtDate(e.expense_date)}</td>
         <td>${e.submitted_by_name}</td>
@@ -308,7 +320,7 @@ export default function ProjectDetail() {
   </div>
   <div class="header-right">
     <div class="logo-box">R</div>
-    <div class="report-date">Expense Report<br>${today}</div>
+    <div class="report-date">Expense Report<br>${today}<br><span style="color:#28a870;font-weight:700;font-size:8pt">${dateRange}</span></div>
   </div>
 </div>
 
@@ -332,7 +344,7 @@ export default function ProjectDetail() {
 <div class="section">
   <div class="section-header">
     <div class="section-title">Expense Records</div>
-    <div class="section-count">${expenses.length} entries</div>
+    <div class="section-count">${printExp.length} entries</div>
   </div>
   <table>
     <thead><tr>
@@ -341,7 +353,7 @@ export default function ProjectDetail() {
     </tr></thead>
     <tbody>${expRows || '<tr><td colspan="6" class="empty">No expenses recorded</td></tr>'}</tbody>
     <tfoot><tr>
-      <td colspan="4">Total &mdash; ${expenses.length} record${expenses.length !== 1 ? 's' : ''}</td>
+      <td colspan="4">Total &mdash; ${printExp.length} record${printExp.length !== 1 ? 's' : ''}</td>
       <td class="num">${BDT(totalSpent)}</td>
       <td><span class="status-ok">${BDT(totalReimb)} paid</span> &nbsp;·&nbsp; <span class="status-pend">${BDT(totalPending)} pending</span></td>
     </tr></tfoot>
@@ -382,58 +394,36 @@ ${project.installments.length > 0 ? `
 </body>
 </html>`;
 
-    // ── Universal print ──────────────────────────────────────────────────────
-    // Desktop: open blob in new tab (already working perfectly — don't change)
-    // Mobile:  blob: URLs can't be opened via window.open on iOS/Android.
-    //          Instead we make the iframe FULL-SCREEN so layout renders
-    //          identically to desktop, call print(), then remove it.
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (!isMobile) {
-      // ── Desktop: existing working approach ──
-      const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
-      const url  = URL.createObjectURL(blob);
-      const win  = window.open(url, '_blank');
-      if (!win) alert('Please allow pop-ups for this site to open the print report.');
-      setTimeout(() => URL.revokeObjectURL(url), 30000);
-      return;
+    // ── Open report in new tab and auto-trigger print dialog ──
+    // The print dialog has "Save as PDF" in every modern browser.
+    // We inject a self-calling window.print() so the user doesn't need Ctrl+P.
+    const htmlWithPrint = html.replace('</body>', '<script>window.onload=function(){window.print();}<\/script></body>');
+    const blob = new Blob([htmlWithPrint], { type: 'text/html;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const win  = window.open(url, '_blank');
+    if (!win) {
+      // Pop-up blocked — fallback: direct download of HTML
+      const a = document.createElement('a');
+      const safeName = (project.code || 'report').replace(/[^a-z0-9_-]/gi, '_');
+      a.href = url; a.download = `${safeName}_report.html`;
+      a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
-
-    // ── Mobile: full-screen iframe so layout = desktop quality ──
-    const iframeId = '__rt_print_frame__';
-    let iframe = document.getElementById(iframeId);
-    if (iframe) iframe.remove();
-
-    iframe = document.createElement('iframe');
-    iframe.id = iframeId;
-    // Full-screen, above everything — makes layout render at full width like desktop
-    iframe.style.cssText = [
-      'position:fixed', 'inset:0', 'width:100vw', 'height:100vh',
-      'z-index:99999', 'border:none', 'background:white',
-      'overflow:auto', 'opacity:1',
-    ].join(';');
-    document.body.appendChild(iframe);
-
-    const doc = iframe.contentDocument || iframe.contentWindow.document;
-    doc.open();
-    doc.write(html);
-    doc.close();
-
-    // Give fonts and layout time to fully render at full width, then print
-    setTimeout(() => {
-      try {
-        iframe.contentWindow.focus();
-        iframe.contentWindow.print();
-      } catch (e) {
-        console.error('iframe print failed:', e);
-      }
-      // Remove iframe after print dialog is dismissed
-      setTimeout(() => { if (iframe) iframe.remove(); }, 1500);
-    }, 600);
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
 
-    if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
+  // ── Report Modal handler ─────────────────────────────────────────────────
+  const handleReportGenerate = (filteredExpenses, meta) => {
+    setShowReportModal(false);
+    if (meta.type === 'xlsx') {
+      handleExportCSV(filteredExpenses);
+    } else {
+      handlePrint(filteredExpenses, meta.label);
+    }
+  };
+
+  if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
   if (!project) return null;
 
   const stats = project.stats || {};
@@ -450,7 +440,10 @@ ${project.installments.length > 0 ? `
     const q = expSearch.toLowerCase();
     const matchQ = !q || e.description.toLowerCase().includes(q) || e.submitted_by_name?.toLowerCase().includes(q) || getCatLabel(e).toLowerCase().includes(q);
     const matchS = !expStatus || (expStatus === 'pending' ? !e.reimbursed : e.reimbursed);
-    return matchQ && matchS;
+    const eDate = new Date(e.expense_date);
+    const matchFrom = !expFrom || eDate >= new Date(expFrom);
+    const matchTo   = !expTo   || eDate <= new Date(expTo);
+    return matchQ && matchS && matchFrom && matchTo;
   });
   displayedExp = [...displayedExp].sort((a, b) => {
     if (expSort === 'date_desc') return new Date(b.expense_date) - new Date(a.expense_date);
@@ -460,6 +453,7 @@ ${project.installments.length > 0 ? `
     if (expSort === 'name') return a.submitted_by_name?.localeCompare(b.submitted_by_name);
     return 0;
   });
+  displayedExpRef.current = displayedExp;
 
   return (
     <>
@@ -471,21 +465,30 @@ ${project.installments.length > 0 ? `
             <span className={`badge ${project.status === 'active' ? 'badge-green' : project.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
               {project.status === 'completed' ? 'Ended' : project.status}
             </span>
-            <span className="badge badge-gray">{project.payment_type}</span>
+            <span className="badge badge-gray">{fmtPayType(project.payment_type)}</span>
           </div>
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
-          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
-          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} className="no-print">
+          {/* Primary action */}
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+
+          {/* Separator */}
+          <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
+
+          {/* Report */}
+          <button className="btn btn-outline btn-sm" onClick={() => setShowReportModal(true)} title="Generate a filtered report as PDF or XLSX">📄 Report</button>
+
+          {/* Admin: Edit & Delete */}
           {isAdmin && (
             <>
+              <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
               <button className="btn btn-outline btn-sm"
-                style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                onClick={() => setShowEditProject(true)}>✏ Edit Project</button>
-              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                onClick={() => setShowEditProject(true)}
+                title="Edit Project">✏ Edit</button>
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)} title="Delete Project">🗑 Delete</button>
             </>
           )}
         </div>
@@ -494,36 +497,36 @@ ${project.installments.length > 0 ? `
       <div className="page-body" ref={printRef}>
         {error && <div className="notice notice-error">⚠ {error}</div>}
 
-        <div className="stats-grid">
+        <div className="stats-grid stats-grid-project">
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
-            <div className="stat-note">{project.payment_type} payment</div>
+            <div className="stat-note">{fmtPayType(project.payment_type)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Funds Received</div><div className="stat-value" style={{ color: 'var(--info)' }}>{fmt(receivedFunds)}</div></div><div className="stat-icon si-teal">🏦</div></div>
             <div className="stat-note">
-              of {fmt(totalInstalled)} scheduled
+              Of {fmt(totalInstalled)} Scheduled
               {totalInstalled > 0 && <span style={{ marginLeft: 6, color: budget - receivedFunds > 0 ? 'var(--warning)' : 'var(--success)' }}>
-                · {fmt(budget - receivedFunds)} outstanding
+                · {fmt(budget - receivedFunds)} Outstanding
               </span>}
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Spent</div><div className="stat-value">{fmt(spent)}</div></div><div className="stat-icon si-blue">📈</div></div>
             <div className="progress"><div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} /></div>
-            <div className="stat-note">{pct.toFixed(1)}% of budget</div>
+            <div className="stat-note">{pct.toFixed(1)}% Of Budget</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Reimbursed</div><div className="stat-value green">{fmt(stats.total_reimbursed)}</div></div><div className="stat-icon si-green">✅</div></div>
-            <div className="stat-note">{reimbursedExp.length} expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{reimbursedExp.length} Expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Pending</div><div className="stat-value amber">{fmt(stats.total_pending)}</div></div><div className="stat-icon si-amber">⏳</div></div>
-            <div className="stat-note">{pendingExp.length} unpaid</div>
+            <div className="stat-note">{pendingExp.length} Unpaid</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Remaining</div><div className={`stat-value ${budget - spent < 0 ? 'red' : 'green'}`}>{fmt(budget - spent)}</div></div><div className="stat-icon si-green">📊</div></div>
-            <div className="stat-note">budget balance</div>
+            <div className="stat-note">Budget Balance</div>
           </div>
         </div>
 
@@ -546,33 +549,39 @@ ${project.installments.length > 0 ? `
             <div className="card-header">
               <span className="card-title">Expense Records</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <span className="badge badge-amber">{pendingExp.length} pending</span>
-                <span className="badge badge-green">{reimbursedExp.length} reimbursed</span>
+                <span className="badge badge-amber">{pendingExp.length} Pending</span>
+                <span className="badge badge-green">{reimbursedExp.length} Reimbursed</span>
               </div>
             </div>
-            <div className="filter-bar no-print" style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
-              <div className="filter-field" style={{ flex: 2 }}>
+            <div className="filter-bar no-print">
+              <div className="filter-field" style={{ flex: 2, minWidth: 160 }}>
                 <input className="form-input" placeholder="Search description, researcher, category…"
-                  value={expSearch} onChange={e => setExpSearch(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }} />
+                  value={expSearch} onChange={e => setExpSearch(e.target.value)} />
               </div>
               <div className="filter-field">
-                <select className="form-select" value={expStatus} onChange={e => setExpStatus(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
-                  <option value="">All status</option>
-                  <option value="pending">Pending only</option>
-                  <option value="reimbursed">Reimbursed only</option>
+                <select className="form-select" value={expStatus} onChange={e => setExpStatus(e.target.value)}>
+                  <option value="">All Status</option>
+                  <option value="pending">Pending Only</option>
+                  <option value="reimbursed">Reimbursed Only</option>
                 </select>
               </div>
               <div className="filter-field">
-                <select className="form-select" value={expSort} onChange={e => setExpSort(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
-                  <option value="date_desc">Newest first</option>
-                  <option value="date_asc">Oldest first</option>
-                  <option value="amount_desc">Highest amount</option>
-                  <option value="amount_asc">Lowest amount</option>
+                <select className="form-select" value={expSort} onChange={e => setExpSort(e.target.value)}>
+                  <option value="date_desc">Newest First</option>
+                  <option value="date_asc">Oldest First</option>
+                  <option value="amount_desc">Highest Amount</option>
+                  <option value="amount_asc">Lowest Amount</option>
                   <option value="name">Researcher A–Z</option>
                 </select>
               </div>
-              {(expSearch || expStatus) && (
-                <button className="btn btn-ghost btn-xs" onClick={() => { setExpSearch(''); setExpStatus(''); }}>✕ Clear</button>
+              <div className="filter-field">
+                <input type="date" className="form-input" value={expFrom || ''} onChange={e => setExpFrom(e.target.value)} title="From date" />
+              </div>
+              <div className="filter-field">
+                <input type="date" className="form-input" value={expTo || ''} onChange={e => setExpTo(e.target.value)} title="To date" />
+              </div>
+              {(expSearch || expStatus || expFrom || expTo) && (
+                <button className="btn btn-ghost btn-xs" onClick={() => { setExpSearch(''); setExpStatus(''); setExpFrom(''); setExpTo(''); }}>✕ Clear</button>
               )}
             </div>
 
@@ -607,45 +616,41 @@ ${project.installments.length > 0 ? `
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
                         {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                         <td className="no-print">
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {/* Edit — admin can always edit; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
-                            )}
-                            {/* Mark Paid — admin only, only if not reimbursed */}
-                            {isAdmin && !e.reimbursed && (
-                              reimbursing === e.id ? (
-                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                  <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
-                                    value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
-                                    <option value="university">University</option>
-                                    <option value="project">Project</option>
-                                  </select>
-                                  <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
-                                  <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
-                                </div>
-                              ) : (
-                                <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Mark Paid</button>
-                              )
-                            )}
-                            {/* Delete — admin can always delete; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)}
-                                style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}>🗑 Delete</button>
-                            )}
-                          </div>
+                          {reimbursing === e.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
+                                value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
+                                <option value="university">University</option>
+                                <option value="project">Project</option>
+                              </select>
+                              <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
+                              <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
+                            </div>
+                          ) : (
+                            <ActionMenu items={[
+                              ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                                { label: '✏ Edit', onClick: () => { setEditExpense(e); setShowExpModal(true); } },
+                              ] : []),
+                              ...(isAdmin && !e.reimbursed ? [
+                                { label: '✓ Mark Paid', onClick: () => { setReimbursing(e.id); setReimburseFrom('university'); }, success: true },
+                              ] : []),
+                              ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                                'divider',
+                                { label: '🗑 Delete', onClick: () => handleDeleteExpense(e.id), danger: true },
+                              ] : []),
+                            ]} />
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot><tr>
-                    <td colSpan={isAdmin ? 4 : 4} style={{ color: 'var(--text-secondary)' }}>Total · {displayedExp.length} records</td>
+                    <td colSpan={isAdmin ? 4 : 4} style={{ color: 'var(--text-secondary)' }}>Total · {displayedExp.length} Records</td>
                     <td className="td-amount">{fmt(displayedExp.reduce((a,e)=>a+Number(e.amount),0))}</td>
                     <td colSpan={isAdmin ? 3 : 2}>
-                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))}</span>
+                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} Reimbursed</span>
                       <span style={{ color: 'var(--text-tertiary)', margin: '0 6px' }}>·</span>
-                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>!e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} pending</span>
+                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>!e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} Pending</span>
                     </td>
                   </tr></tfoot>
                 </table>
@@ -727,9 +732,9 @@ ${project.installments.length > 0 ? `
                     <td colSpan={2}>Total ({project.installments.length} installment{project.installments.length !== 1 ? 's' : ''})</td>
                     <td className="td-amount">{fmt(totalInstalled)}</td>
                     <td colSpan={isAdmin ? 4 : 3}>
-                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(receivedFunds)} received</span>
+                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(receivedFunds)} Received</span>
                       <span style={{ margin: '0 8px', color: 'var(--text-tertiary)' }}>·</span>
-                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totalInstalled - receivedFunds)} pending</span>
+                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totalInstalled - receivedFunds)} Pending</span>
                     </td>
                   </tr></tfoot>
                 </table>
@@ -773,6 +778,13 @@ ${project.installments.length > 0 ? `
         )}
       </div>
 
+      {showReportModal && (
+        <ReportModal
+          expenses={expenses}
+          onClose={() => setShowReportModal(false)}
+          onGenerate={handleReportGenerate}
+        />
+      )}
       {showExpModal && (
         <ExpenseModal
           projectId={id}

@@ -100,7 +100,7 @@ export default function Dashboard() {
               </div>
               <div className="stat-icon si-indigo">💰</div>
             </div>
-            <div className="stat-note">{projects.length} project{projects.length !== 1 ? 's' : ''} total</div>
+            <div className="stat-note">{projects.length} Project{projects.length !== 1 ? 's' : ''} Total</div>
           </div>
 
           <div className="stat-card">
@@ -114,7 +114,7 @@ export default function Dashboard() {
             <div className="progress">
               <div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} />
             </div>
-            <div className="stat-note">{pct.toFixed(1)}% of total budget utilised</div>
+            <div className="stat-note">{pct.toFixed(1)}% Of Total Budget Utilised</div>
           </div>
 
           <div className="stat-card">
@@ -125,7 +125,7 @@ export default function Dashboard() {
               </div>
               <div className="stat-icon si-green">✅</div>
             </div>
-            <div className="stat-note">Returned to researchers</div>
+            <div className="stat-note">Returned To Researchers</div>
           </div>
 
           <div className="stat-card">
@@ -136,7 +136,7 @@ export default function Dashboard() {
               </div>
               <div className="stat-icon si-amber">⏳</div>
             </div>
-            <div className="stat-note">Awaiting reimbursement</div>
+            <div className="stat-note">Awaiting Reimbursement</div>
           </div>
         </div>
 
@@ -144,7 +144,7 @@ export default function Dashboard() {
         <div className="section-header">
           <div>
             <div className="section-title">Research Projects</div>
-            <div className="section-subtitle">{filtered.length} of {projects.length} project{projects.length !== 1 ? 's' : ''} · click any to view details</div>
+            <div className="section-subtitle">{filtered.length} Of {projects.length} Project{projects.length !== 1 ? 's' : ''} · Click Any To View Details</div>
           </div>
           {isAdmin && (
             <button className="btn btn-outline btn-sm no-print" onClick={() => { setEditProject(null); setShowModal(true); }}>
@@ -156,6 +156,12 @@ export default function Dashboard() {
         {/* Search + Filter bar */}
         {projects.length > 0 && (
           <div className="card no-print" style={{ marginBottom: 20 }}>
+            <div className="card-header">
+              <span className="card-title">Filter & Search</span>
+              {(search || statusFilter) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>✕ Clear</button>
+              )}
+            </div>
             <div className="filter-bar" style={{ padding: '14px 18px' }}>
               <div className="filter-field" style={{ flex: 2 }}>
                 <label className="form-label">Search</label>
@@ -182,11 +188,6 @@ export default function Dashboard() {
                   <option value="spent">Most spent</option>
                 </select>
               </div>
-              {(search || statusFilter) && (
-                <div className="filter-field" style={{ alignSelf: 'flex-end' }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>✕ Clear</button>
-                </div>
-              )}
             </div>
           </div>
         )}
@@ -223,7 +224,7 @@ export default function Dashboard() {
                         {isAdmin && (
                           <button
                             className="btn btn-ghost btn-xs no-print"
-                            style={{ color: 'var(--accent)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
+                            style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
                             onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
                           >✏</button>
                         )}
@@ -231,12 +232,12 @@ export default function Dashboard() {
                     </div>
                     <div className="project-title">{p.name}</div>
                     <div className="project-tags">
-                      <span className="badge badge-indigo">{p.payment_type}</span>
+                      <span className="badge badge-indigo">{{ upfront: 'Upfront', end: 'End Payment', installment: 'Installment' }[p.payment_type] || p.payment_type}</span>
                     </div>
                     <div className="progress" style={{ margin: '4px 0 6px' }}>
                       <div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} />
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% of budget used</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% Of Budget Used</div>
                     <div className="project-stats">
                       <div><div className="ps-label">Budget</div><div className="ps-value">{fmt(budget)}</div></div>
                       <div><div className="ps-label">Spent</div><div className="ps-value">{fmt(spent)}</div></div>
