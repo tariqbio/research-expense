@@ -826,21 +826,40 @@ tfoot td { padding:10px 14px; border-top:2px solid var(--border-strong); font-we
     transform: translateX(0);
   }
   .hamburger-btn { display: flex; }
-  .main-wrapper { margin-left:0; }
-  .page-body { padding:14px; }
-  .page-header { padding:14px 14px 0; flex-wrap: wrap; gap: 10px; }
-  .topbar { padding:0 14px; gap: 8px; }
+  .main-wrapper { margin-left:0; width:100%; max-width:100vw; }
+  .page-body { padding:12px; padding-bottom:32px; }
+  .page-header { padding:12px 12px 0; flex-wrap: wrap; gap: 10px; }
+  .topbar { padding:0 12px; gap: 8px; }
   .topbar-clock { display: none; }
   .form-row { grid-template-columns:1fr; }
   .stats-grid { grid-template-columns:1fr 1fr; }
   .projects-grid { grid-template-columns: 1fr; }
-  .filter-bar { flex-direction: column; }
-  .filter-field { width: 100%; }
-  .table-wrap { -webkit-overflow-scrolling: touch; }
-  tbody td { font-size: 12px; padding: 10px 10px; }
-  thead th { padding: 8px 10px; }
+
+  /* Filter bar: wrap into 2-col grid on mobile instead of stacking single column */
+  .filter-bar { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px !important; }
+  .filter-field { width:100%; min-width:0; }
+  .filter-field:first-child { grid-column: 1 / -1; } /* Search always full width */
+  .filter-field .form-select,
+  .filter-field .form-input { width:100%; min-width:0; max-width:100%; box-sizing:border-box; }
+
+  /* Table: allow horizontal scroll on mobile, prevent content overflow */
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; display:block; width:100%; }
+  .table-wrap table { min-width:640px; }
+  tbody td { font-size: 11px; padding: 8px 8px; }
+  thead th { padding: 7px 8px; font-size: 9px; }
+
+  /* Fix blank right-side space */
+  html, body { overflow-x: hidden; max-width: 100vw; }
   .page-title { font-size: 18px; }
   .stat-card { padding: 14px 16px; }
+  .card { border-radius: 10px; }
+
+  /* Tabs scroll on mobile */
+  .tabs { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 2px; }
+  .tab-btn { white-space: nowrap; }
+
+  /* Page header actions wrap cleanly */
+  .page-header > div:last-child { flex-wrap: wrap; gap: 6px; }
 
   /* Mobile login — full-screen, hero-quality */
   .login-page { grid-template-columns:1fr; }
