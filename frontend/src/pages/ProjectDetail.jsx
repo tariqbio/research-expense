@@ -7,7 +7,6 @@ import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import RowActions from '../components/RowActions';
-import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -79,12 +78,6 @@ export default function ProjectDetail() {
       });
       load();
     } catch(e) { alert('Failed to update installment.'); }
-  };
-
-  // ── XLSX Export ─────────────────────────────────────────────────────────────
-  const handleExportCSV = () => {
-    if (!project) return;
-    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
@@ -478,22 +471,16 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div className="page-actions no-print">
-          <div className="page-actions-group">
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export CSV</button>
-            <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print</button>
-          </div>
-          {isAdmin && <div className="page-actions-divider" />}
-          <div className="page-actions-group">
-            <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
-            {isAdmin && (
-              <button className="btn btn-outline btn-sm"
-                style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                onClick={() => setShowEditProject(true)}>✏ Edit</button>
-            )}
-            {isAdmin && (
-              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑</button>
-            )}
-          </div>
+          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
+          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+          {isAdmin && (
+            <button className="btn btn-outline btn-sm"
+              style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+              onClick={() => setShowEditProject(true)}>✏ Edit</button>
+          )}
+          {isAdmin && (
+            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+          )}
         </div>
       </div>
 
