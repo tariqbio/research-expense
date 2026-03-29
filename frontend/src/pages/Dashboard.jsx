@@ -231,7 +231,7 @@ export default function Dashboard() {
                     </div>
                     <div className="project-title">{p.name}</div>
                     <div className="project-tags">
-                      <span className="badge badge-indigo">{p.payment_type}</span>
+                      <span className="badge badge-indigo">{{ upfront: 'Upfront', end: 'End Payment', installment: 'Installment' }[p.payment_type] || p.payment_type}</span>
                     </div>
                     <div className="progress" style={{ margin: '4px 0 6px' }}>
                       <div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} />

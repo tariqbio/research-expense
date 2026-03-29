@@ -11,6 +11,7 @@ import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmtPayType = t => ({ upfront: 'Upfront Payment', end: 'End Payment', installment: 'Installment Payment' }[t] || t);
 
 const CAT_LABELS = { transportation:'Transportation', printing_stationery:'Printing & Stationery', field_work:'Field Work', communication:'Communication', other:'Other', miscellaneous:'Miscellaneous' };
 const CAT_BADGE  = { transportation:'badge-teal', printing_stationery:'badge-indigo', field_work:'badge-green', communication:'badge-amber', other:'badge-gray', miscellaneous:'badge-gray' };
@@ -39,6 +40,8 @@ export default function ProjectDetail() {
   const [expSearch, setExpSearch] = useState('');
   const [expSort, setExpSort]     = useState('date_desc');
   const [expStatus, setExpStatus] = useState('');
+  const [expFrom, setExpFrom]     = useState('');
+  const [expTo, setExpTo]         = useState('');
 
   const load = async () => {
     try {
@@ -81,10 +84,12 @@ export default function ProjectDetail() {
     } catch(e) { alert('Failed to update installment.'); }
   };
 
+  const displayedExpRef = useRef([]);
+
   // ── XLSX Export ─────────────────────────────────────────────────────────────
   const handleExportCSV = () => {
     if (!project) return;
-    exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate });
+    exportProjectXlsx({ project, expenses: displayedExpRef.current, stats, getCatLabel, fmtDate });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
@@ -93,14 +98,18 @@ export default function ProjectDetail() {
     const BDT = n => '&#2547;' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
     const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-    const totalSpent   = Number(stats.total_spent || 0);
-    const totalReimb   = Number(stats.total_reimbursed || 0);
-    const totalPending = Number(stats.total_pending || 0);
+    const printExp    = displayedExpRef.current;
+    const totalSpent   = printExp.reduce((a, e) => a + Number(e.amount), 0);
+    const totalReimb   = printExp.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
+    const totalPending = printExp.filter(e => !e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
     const budget       = Number(project.total_budget || 0);
     const remaining    = budget - totalSpent;
     const pct          = budget > 0 ? Math.min(100, (totalSpent / budget) * 100).toFixed(1) : '0.0';
+    const dateRange    = (expFrom || expTo)
+      ? `${expFrom ? fmtDate(expFrom) : 'Start'} — ${expTo ? fmtDate(expTo) : 'Present'}`
+      : 'All Dates';
 
-    const expRows = expenses.map((e, i) => `
+    const expRows = printExp.map((e, i) => `
       <tr class="${i % 2 === 0 ? 'even' : ''}">
         <td>${fmtDate(e.expense_date)}</td>
         <td>${e.submitted_by_name}</td>
@@ -309,7 +318,7 @@ export default function ProjectDetail() {
   </div>
   <div class="header-right">
     <div class="logo-box">R</div>
-    <div class="report-date">Expense Report<br>${today}</div>
+    <div class="report-date">Expense Report<br>${today}<br><span style="color:#28a870;font-weight:700;font-size:8pt">${dateRange}</span></div>
   </div>
 </div>
 
@@ -333,7 +342,7 @@ export default function ProjectDetail() {
 <div class="section">
   <div class="section-header">
     <div class="section-title">Expense Records</div>
-    <div class="section-count">${expenses.length} entries</div>
+    <div class="section-count">${printExp.length} entries</div>
   </div>
   <table>
     <thead><tr>
@@ -342,7 +351,7 @@ export default function ProjectDetail() {
     </tr></thead>
     <tbody>${expRows || '<tr><td colspan="6" class="empty">No expenses recorded</td></tr>'}</tbody>
     <tfoot><tr>
-      <td colspan="4">Total &mdash; ${expenses.length} record${expenses.length !== 1 ? 's' : ''}</td>
+      <td colspan="4">Total &mdash; ${printExp.length} record${printExp.length !== 1 ? 's' : ''}</td>
       <td class="num">${BDT(totalSpent)}</td>
       <td><span class="status-ok">${BDT(totalReimb)} paid</span> &nbsp;·&nbsp; <span class="status-pend">${BDT(totalPending)} pending</span></td>
     </tr></tfoot>
@@ -451,7 +460,10 @@ ${project.installments.length > 0 ? `
     const q = expSearch.toLowerCase();
     const matchQ = !q || e.description.toLowerCase().includes(q) || e.submitted_by_name?.toLowerCase().includes(q) || getCatLabel(e).toLowerCase().includes(q);
     const matchS = !expStatus || (expStatus === 'pending' ? !e.reimbursed : e.reimbursed);
-    return matchQ && matchS;
+    const eDate = new Date(e.expense_date);
+    const matchFrom = !expFrom || eDate >= new Date(expFrom);
+    const matchTo   = !expTo   || eDate <= new Date(expTo);
+    return matchQ && matchS && matchFrom && matchTo;
   });
   displayedExp = [...displayedExp].sort((a, b) => {
     if (expSort === 'date_desc') return new Date(b.expense_date) - new Date(a.expense_date);
@@ -461,6 +473,7 @@ ${project.installments.length > 0 ? `
     if (expSort === 'name') return a.submitted_by_name?.localeCompare(b.submitted_by_name);
     return 0;
   });
+  displayedExpRef.current = displayedExp;
 
   return (
     <>
@@ -472,7 +485,7 @@ ${project.installments.length > 0 ? `
             <span className={`badge ${project.status === 'active' ? 'badge-green' : project.status === 'completed' ? 'badge-teal' : 'badge-gray'}`}>
               {project.status === 'completed' ? 'Ended' : project.status}
             </span>
-            <span className="badge badge-gray">{project.payment_type}</span>
+            <span className="badge badge-gray">{fmtPayType(project.payment_type)}</span>
           </div>
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
@@ -485,8 +498,8 @@ ${project.installments.length > 0 ? `
           <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
 
           {/* Export & Print */}
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} title="Export to Excel">📊 XLS</button>
-          <button className="btn btn-outline btn-sm" onClick={handlePrint} title="Print Report">🖨 Print</button>
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} title="Download expense data as Excel spreadsheet">📥 Download XLS</button>
+          <button className="btn btn-outline btn-sm" onClick={handlePrint} title="Opens a print-ready report — in the print dialog choose 'Save as PDF' to download">🖨 Print / Save PDF</button>
 
           {/* Admin: Edit & Delete */}
           {isAdmin && (
@@ -508,7 +521,7 @@ ${project.installments.length > 0 ? `
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
-            <div className="stat-note">{project.payment_type} Payment</div>
+            <div className="stat-note">{fmtPayType(project.payment_type)}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Funds Received</div><div className="stat-value" style={{ color: 'var(--info)' }}>{fmt(receivedFunds)}</div></div><div className="stat-icon si-teal">🏦</div></div>
@@ -561,29 +574,36 @@ ${project.installments.length > 0 ? `
                 <span className="badge badge-green">{reimbursedExp.length} Reimbursed</span>
               </div>
             </div>
-            <div className="filter-bar no-print" style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
-              <div className="filter-field" style={{ flex: 2 }}>
+            <div className="filter-bar no-print" style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: 8 }}>
+              <div className="filter-field" style={{ flex: 2, minWidth: 140 }}>
                 <input className="form-input" placeholder="Search description, researcher, category…"
                   value={expSearch} onChange={e => setExpSearch(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }} />
               </div>
               <div className="filter-field">
                 <select className="form-select" value={expStatus} onChange={e => setExpStatus(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
-                  <option value="">All status</option>
-                  <option value="pending">Pending only</option>
-                  <option value="reimbursed">Reimbursed only</option>
+                  <option value="">All Status</option>
+                  <option value="pending">Pending Only</option>
+                  <option value="reimbursed">Reimbursed Only</option>
                 </select>
               </div>
               <div className="filter-field">
                 <select className="form-select" value={expSort} onChange={e => setExpSort(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
-                  <option value="date_desc">Newest first</option>
-                  <option value="date_asc">Oldest first</option>
-                  <option value="amount_desc">Highest amount</option>
-                  <option value="amount_asc">Lowest amount</option>
+                  <option value="date_desc">Newest First</option>
+                  <option value="date_asc">Oldest First</option>
+                  <option value="amount_desc">Highest Amount</option>
+                  <option value="amount_asc">Lowest Amount</option>
                   <option value="name">Researcher A–Z</option>
                 </select>
               </div>
-              {(expSearch || expStatus) && (
-                <button className="btn btn-ghost btn-xs" onClick={() => { setExpSearch(''); setExpStatus(''); }}>✕ Clear</button>
+              <div className="filter-field" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input type="date" className="form-input" value={expFrom} onChange={e => setExpFrom(e.target.value)}
+                  style={{ padding: '7px 10px', fontSize: 13 }} title="From date" />
+                <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>—</span>
+                <input type="date" className="form-input" value={expTo} onChange={e => setExpTo(e.target.value)}
+                  style={{ padding: '7px 10px', fontSize: 13 }} title="To date" />
+              </div>
+              {(expSearch || expStatus || expFrom || expTo) && (
+                <button className="btn btn-ghost btn-xs" onClick={() => { setExpSearch(''); setExpStatus(''); setExpFrom(''); setExpTo(''); }}>✕ Clear</button>
               )}
             </div>
 

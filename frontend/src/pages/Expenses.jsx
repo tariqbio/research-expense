@@ -97,8 +97,8 @@ export default function Expenses() {
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
           <div className="export-bar">
-            <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
-            <button className="btn btn-outline btn-sm" onClick={() => window.print()}>🖨 Print</button>
+            <button className="btn btn-outline btn-sm" onClick={handleExportCSV} title="Download expense data as Excel spreadsheet">📥 Download XLS</button>
+            <button className="btn btn-outline btn-sm" onClick={() => window.print()} title="Opens print dialog — choose 'Save as PDF' to download">🖨 Print / Save PDF</button>
           </div>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>
         </div>
@@ -212,42 +212,59 @@ export default function Expenses() {
               <p>No Expense Records Match The Current Filters.</p>
             </div>
           ) : (
-            <div className="table-wrap">
-              <table>
+            <div>
+              <table style={{ tableLayout: 'fixed', width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
+                <colgroup>
+                  <col style={{ width: '80px' }} />
+                  <col style={{ width: '108px' }} />
+                  <col style={{ width: '108px' }} />
+                  <col style={{ width: '108px' }} />
+                  <col />
+                  <col style={{ width: '96px' }} />
+                  <col style={{ width: '80px' }} />
+                  {isAdmin && <col style={{ width: '68px' }} />}
+                  <col style={{ width: '36px' }} className="no-print" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Project</th>
-                    <th>Submitted By</th>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
-                    <th>Status</th>
-                    {isAdmin && <th>Source</th>}
-                    <th className="no-print"></th>
+                    <th style={{ padding: '8px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Date</th>
+                    <th style={{ padding: '8px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Project</th>
+                    <th style={{ padding: '8px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Submitted By</th>
+                    <th style={{ padding: '8px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Category</th>
+                    <th style={{ padding: '8px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Description</th>
+                    <th style={{ padding: '8px 8px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)', textAlign: 'right' }}>Amount</th>
+                    <th style={{ padding: '8px 6px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Status</th>
+                    {isAdmin && <th style={{ padding: '8px 6px', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}>Source</th>}
+                    <th className="no-print" style={{ padding: '8px 4px', borderBottom: '1px solid var(--border)', background: 'var(--bg-subtle)' }}></th>
                   </tr>
                 </thead>
                 <tbody>
                   {displayed.map(e => (
-                    <tr key={e.id}>
-                      <td className="td-date">{fmtDate(e.expense_date)}</td>
-                      <td>
-                        <div style={{ marginBottom: 2 }}><span className="td-code">{e.project_code}</span></div>
-                        <div style={{ fontSize: 12, color: 'var(--text-secondary)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
+                    <tr key={e.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '8px 8px', fontSize: 11, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{fmtDate(e.expense_date)}</td>
+                      <td style={{ padding: '8px 8px', overflow: 'hidden' }}>
+                        <div style={{ fontWeight: 700, fontSize: 10, marginBottom: 1 }}><span className="td-code" style={{ fontSize: 10 }}>{e.project_code}</span></div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.project_name}>{e.project_name}</div>
                       </td>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: 13 }}>{e.submitted_by_name}</div>
-                        {e.reimbursed && <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Paid {fmtDate(e.reimbursed_at)}</div>}
+                      <td style={{ padding: '8px 8px', overflow: 'hidden' }}>
+                        <div style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.submitted_by_name}</div>
+                        {e.reimbursed && <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>Paid {fmtDate(e.reimbursed_at)}</div>}
                       </td>
-                      <td><span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`}>{getCatLabel(e)}</span></td>
-                      <td style={{ maxWidth: 220 }}>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{e.description}</div>
-                        {e.receipt_note && <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>{e.receipt_note}</div>}
+                      <td style={{ padding: '8px 8px' }}>
+                        <span className={`badge ${CAT_BADGE[e.category] || 'badge-gray'}`} style={{ fontSize: 10, padding: '2px 5px' }}>{getCatLabel(e)}</span>
                       </td>
-                      <td className="td-amount">{fmt(e.amount)}</td>
-                      <td>{e.reimbursed ? <span className="badge badge-green">✓ Reimbursed</span> : <span className="badge badge-amber">Pending</span>}</td>
-                      {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
-                      <td className="no-print">
+                      <td style={{ padding: '8px 8px', overflow: 'hidden' }}>
+                        <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={e.description}>{e.description}</div>
+                        {e.receipt_note && <div style={{ fontSize: 10, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.receipt_note}</div>}
+                      </td>
+                      <td style={{ padding: '8px 8px', fontSize: 12, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(e.amount)}</td>
+                      <td style={{ padding: '8px 6px' }}>
+                        {e.reimbursed
+                          ? <span className="badge badge-green" style={{ fontSize: 10, padding: '2px 5px' }}>✓ Paid</span>
+                          : <span className="badge badge-amber" style={{ fontSize: 10, padding: '2px 5px' }}>Pending</span>}
+                      </td>
+                      {isAdmin && <td style={{ padding: '8px 6px', fontSize: 11, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'Univ.' : 'Proj.') : '—'}</td>}
+                      <td className="no-print" style={{ padding: '8px 4px', textAlign: 'center' }}>
                         <ActionMenu items={[
                           ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
                             { label: '✏ Edit', onClick: () => { setEditExpense(e); setShowModal(true); } },
@@ -262,11 +279,11 @@ export default function Expenses() {
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={isAdmin ? 5 : 5} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} Records</td>
-                    <td className="td-amount">{fmt(totals.total)}</td>
-                    <td colSpan={isAdmin ? 3 : 2}>
+                    <td colSpan={5} style={{ padding: '8px 8px', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, borderTop: '2px solid var(--border-strong)', background: 'var(--bg-subtle)' }}>Total · {displayed.length} Records</td>
+                    <td style={{ padding: '8px 8px', fontSize: 12, fontWeight: 700, textAlign: 'right', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums', borderTop: '2px solid var(--border-strong)', background: 'var(--bg-subtle)' }}>{fmt(totals.total)}</td>
+                    <td colSpan={isAdmin ? 3 : 2} style={{ padding: '8px 6px', fontSize: 11, borderTop: '2px solid var(--border-strong)', background: 'var(--bg-subtle)' }}>
                       <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(totals.reimbursed)} Reimbursed</span>
-                      <span style={{ color: 'var(--text-tertiary)', margin: '0 8px' }}>·</span>
+                      <span style={{ color: 'var(--text-tertiary)', margin: '0 5px' }}>·</span>
                       <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totals.pending)} Pending</span>
                     </td>
                   </tr>
