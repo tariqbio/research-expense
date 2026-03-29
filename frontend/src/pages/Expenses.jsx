@@ -297,11 +297,11 @@ export default function Expenses() {
             </div>
             <div className="filter-field">
               <label className="form-label">From Date</label>
-              <input type="date" className="form-input" value={filters.from_date} onChange={e => setF('from_date', e.target.value)} />
+              <input type="date" className="form-input" value={filters.from_date || ''} onChange={e => setF('from_date', e.target.value)} />
             </div>
             <div className="filter-field">
               <label className="form-label">To Date</label>
-              <input type="date" className="form-input" value={filters.to_date} onChange={e => setF('to_date', e.target.value)} />
+              <input type="date" className="form-input" value={filters.to_date || ''} onChange={e => setF('to_date', e.target.value)} />
             </div>
             <div className="filter-field">
               <label className="form-label">Sort By</label>

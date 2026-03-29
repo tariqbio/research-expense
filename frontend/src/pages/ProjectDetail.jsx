@@ -497,7 +497,7 @@ ${project.installments.length > 0 ? `
       <div className="page-body" ref={printRef}>
         {error && <div className="notice notice-error">⚠ {error}</div>}
 
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="stats-grid stats-grid-project">
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
             <div className="stat-note">{fmtPayType(project.payment_type)}</div>
@@ -575,10 +575,10 @@ ${project.installments.length > 0 ? `
                 </select>
               </div>
               <div className="filter-field" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <input type="date" className="form-input" value={expFrom} onChange={e => setExpFrom(e.target.value)}
+                <input type="date" className="form-input" value={expFrom || ''} onChange={e => setExpFrom(e.target.value)}
                   style={{ padding: '7px 10px', fontSize: 13 }} title="From date" />
                 <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>—</span>
-                <input type="date" className="form-input" value={expTo} onChange={e => setExpTo(e.target.value)}
+                <input type="date" className="form-input" value={expTo || ''} onChange={e => setExpTo(e.target.value)}
                   style={{ padding: '7px 10px', fontSize: 13 }} title="To date" />
               </div>
               {(expSearch || expStatus || expFrom || expTo) && (

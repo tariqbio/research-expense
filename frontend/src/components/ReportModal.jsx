@@ -136,12 +136,12 @@ export default function ReportModal({ expenses, onClose, onGenerate }) {
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>From</label>
-                  <input type="date" value={spendFrom} onChange={e => setSpendFrom(e.target.value)} style={inp} />
+                  <input type="date" className="form-input" value={spendFrom || ''} onChange={e => setSpendFrom(e.target.value)} style={inp} />
                 </div>
                 <span style={{ color: 'var(--text-tertiary)', marginTop: 18 }}>—</span>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>To</label>
-                  <input type="date" value={spendTo} onChange={e => setSpendTo(e.target.value)} style={inp} />
+                  <input type="date" className="form-input" value={spendTo || ''} onChange={e => setSpendTo(e.target.value)} style={inp} />
                 </div>
               </div>
             </div>
@@ -155,12 +155,12 @@ export default function ReportModal({ expenses, onClose, onGenerate }) {
               <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>From</label>
-                  <input type="date" value={entryFrom} onChange={e => setEntryFrom(e.target.value)} style={inp} />
+                  <input type="date" className="form-input" value={entryFrom || ''} onChange={e => setEntryFrom(e.target.value)} style={inp} />
                 </div>
                 <span style={{ color: 'var(--text-tertiary)', marginTop: 18 }}>—</span>
                 <div style={{ flex: 1 }}>
                   <label style={lbl}>To</label>
-                  <input type="date" value={entryTo} onChange={e => setEntryTo(e.target.value)} style={inp} />
+                  <input type="date" className="form-input" value={entryTo || ''} onChange={e => setEntryTo(e.target.value)} style={inp} />
                 </div>
               </div>
             </div>

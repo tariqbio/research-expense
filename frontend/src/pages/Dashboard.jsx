@@ -156,6 +156,12 @@ export default function Dashboard() {
         {/* Search + Filter bar */}
         {projects.length > 0 && (
           <div className="card no-print" style={{ marginBottom: 20 }}>
+            <div className="card-header">
+              <span className="card-title">Filter & Search</span>
+              {(search || statusFilter) && (
+                <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>✕ Clear</button>
+              )}
+            </div>
             <div className="filter-bar" style={{ padding: '14px 18px' }}>
               <div className="filter-field" style={{ flex: 2 }}>
                 <label className="form-label">Search</label>
@@ -182,11 +188,6 @@ export default function Dashboard() {
                   <option value="spent">Most spent</option>
                 </select>
               </div>
-              {(search || statusFilter) && (
-                <div className="filter-field" style={{ alignSelf: 'flex-end' }}>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>✕ Clear</button>
-                </div>
-              )}
             </div>
           </div>
         )}
