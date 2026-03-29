@@ -476,16 +476,26 @@ ${project.installments.length > 0 ? `
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }} className="no-print">
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV}>📊 Export XLS</button>
-          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
-          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} className="no-print">
+          {/* Primary action */}
+          <button className="btn btn-primary btn-sm" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+
+          {/* Separator */}
+          <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
+
+          {/* Export & Print */}
+          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} title="Export to Excel">📊 XLS</button>
+          <button className="btn btn-outline btn-sm" onClick={handlePrint} title="Print Report">🖨 Print</button>
+
+          {/* Admin: Edit & Delete */}
           {isAdmin && (
             <>
+              <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
               <button className="btn btn-outline btn-sm"
-                style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-                onClick={() => setShowEditProject(true)}>✏ Edit Project</button>
-              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
+                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                onClick={() => setShowEditProject(true)}
+                title="Edit Project">✏ Edit</button>
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)} title="Delete Project">🗑 Delete</button>
             </>
           )}
         </div>
@@ -494,7 +504,7 @@ ${project.installments.length > 0 ? `
       <div className="page-body" ref={printRef}>
         {error && <div className="notice notice-error">⚠ {error}</div>}
 
-        <div className="stats-grid">
+        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
             <div className="stat-note">{project.payment_type} payment</div>

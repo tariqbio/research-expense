@@ -223,7 +223,7 @@ export default function Dashboard() {
                         {isAdmin && (
                           <button
                             className="btn btn-ghost btn-xs no-print"
-                            style={{ color: 'var(--accent)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
+                            style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
                             onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
                           >✏</button>
                         )}
