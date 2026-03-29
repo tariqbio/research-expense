@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 
 export default function ActionMenu({ items = [] }) {
   const [open, setOpen] = useState(false);
-  const [hovered, setHovered] = useState(null);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -36,14 +35,12 @@ export default function ActionMenu({ items = [] }) {
                 <button
                   key={i}
                   disabled={item.disabled}
-                  onMouseEnter={() => setHovered(i)}
-                  onMouseLeave={() => setHovered(null)}
-                  onClick={e => { e.stopPropagation(); setOpen(false); setHovered(null); item.onClick?.(e); }}
+                  onClick={e => { e.stopPropagation(); setOpen(false); item.onClick?.(e); }}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 8,
                     width: '100%', textAlign: 'left',
                     padding: '8px 14px', fontSize: 13, fontWeight: 500,
-                    background: hovered === i ? 'var(--bg-subtle)' : 'transparent',
+                    background: 'transparent',
                     border: 'none',
                     cursor: item.disabled ? 'not-allowed' : 'pointer',
                     color: item.danger
@@ -55,6 +52,8 @@ export default function ActionMenu({ items = [] }) {
                     transition: 'background 0.1s',
                     whiteSpace: 'nowrap',
                   }}
+                  onMouseEnter={e => { if (!item.disabled) e.currentTarget.style.background = 'var(--bg-subtle)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   {item.label}
                 </button>

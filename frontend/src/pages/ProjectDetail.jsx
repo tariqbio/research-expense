@@ -8,6 +8,7 @@ import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import ActionMenu from '../components/ActionMenu';
 import { exportProjectXlsx } from '../utils/exportXlsx';
+import ReportModal from '../components/ReportModal';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -36,6 +37,7 @@ export default function ProjectDetail() {
   const [reimburseFrom, setReimburseFrom] = useState('university');
   const [error, setError] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [expSearch, setExpSearch] = useState('');
   const [expSort, setExpSort]     = useState('date_desc');
@@ -87,27 +89,27 @@ export default function ProjectDetail() {
   const displayedExpRef = useRef([]);
 
   // ── XLSX Export ─────────────────────────────────────────────────────────────
-  const handleExportCSV = () => {
+  const handleExportCSV = (expList) => {
     if (!project) return;
-    exportProjectXlsx({ project, expenses: displayedExpRef.current, stats, getCatLabel, fmtDate });
+    exportProjectXlsx({ project, expenses: expList || displayedExpRef.current, stats, getCatLabel, fmtDate });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
-  const handlePrint = () => {
+  const handlePrint = (expList, reportLabel) => {
     if (!project) return;
     const BDT = n => '&#2547;' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
     const today = new Date().toLocaleDateString('en-GB', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
 
-    const printExp    = displayedExpRef.current;
+    const printExp    = expList || displayedExpRef.current;
     const totalSpent   = printExp.reduce((a, e) => a + Number(e.amount), 0);
     const totalReimb   = printExp.filter(e => e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
     const totalPending = printExp.filter(e => !e.reimbursed).reduce((a, e) => a + Number(e.amount), 0);
     const budget       = Number(project.total_budget || 0);
     const remaining    = budget - totalSpent;
     const pct          = budget > 0 ? Math.min(100, (totalSpent / budget) * 100).toFixed(1) : '0.0';
-    const dateRange    = (expFrom || expTo)
+    const dateRange    = reportLabel || ((expFrom || expTo)
       ? `${expFrom ? fmtDate(expFrom) : 'Start'} — ${expTo ? fmtDate(expTo) : 'Present'}`
-      : 'All Dates';
+      : 'All Dates');
 
     const expRows = printExp.map((e, i) => `
       <tr class="${i % 2 === 0 ? 'even' : ''}">
@@ -443,7 +445,17 @@ ${project.installments.length > 0 ? `
   };
 
 
-    if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
+  // ── Report Modal handler ─────────────────────────────────────────────────
+  const handleReportGenerate = (filteredExpenses, meta) => {
+    setShowReportModal(false);
+    if (meta.type === 'xlsx') {
+      handleExportCSV(filteredExpenses);
+    } else {
+      handlePrint(filteredExpenses, meta.label);
+    }
+  };
+
+  if (loading) return <div className="loading-screen"><div className="spinner" /><div className="loading-label">Loading project…</div></div>;
   if (!project) return null;
 
   const stats = project.stats || {};
@@ -497,9 +509,8 @@ ${project.installments.length > 0 ? `
           {/* Separator */}
           <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
 
-          {/* Export & Print */}
-          <button className="btn btn-outline btn-sm" onClick={handleExportCSV} title="Download expense data as Excel spreadsheet">📥 Download XLS</button>
-          <button className="btn btn-outline btn-sm" onClick={handlePrint} title="Opens a print-ready report — in the print dialog choose 'Save as PDF' to download">🖨 Print / Save PDF</button>
+          {/* Report */}
+          <button className="btn btn-outline btn-sm" onClick={() => setShowReportModal(true)} title="Generate a filtered report as PDF or XLSX">📄 Report</button>
 
           {/* Admin: Edit & Delete */}
           {isAdmin && (
@@ -800,6 +811,13 @@ ${project.installments.length > 0 ? `
         )}
       </div>
 
+      {showReportModal && (
+        <ReportModal
+          expenses={expenses}
+          onClose={() => setShowReportModal(false)}
+          onGenerate={handleReportGenerate}
+        />
+      )}
       {showExpModal && (
         <ExpenseModal
           projectId={id}
