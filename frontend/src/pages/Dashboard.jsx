@@ -236,7 +236,7 @@ export default function Dashboard() {
                     <div className="progress" style={{ margin: '4px 0 6px' }}>
                       <div className={`progress-fill${spentPct > 90 ? ' danger' : spentPct > 70 ? ' warn' : ''}`} style={{ width: spentPct + '%' }} />
                     </div>
-                    <div style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% of budget used</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 14 }}>{spentPct.toFixed(1)}% of budget used</div>
                     <div className="project-stats">
                       <div><div className="ps-label">Budget</div><div className="ps-value">{fmt(budget)}</div></div>
                       <div><div className="ps-label">Spent</div><div className="ps-value">{fmt(spent)}</div></div>
