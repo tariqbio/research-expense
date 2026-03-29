@@ -470,25 +470,13 @@ ${project.installments.length > 0 ? `
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }} className="no-print">
-          {/* Primary action */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} className="no-print">
           <button className="btn btn-primary btn-sm" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
-
-          {/* Separator */}
-          <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
-
-          {/* Report */}
-          <button className="btn btn-outline btn-sm" onClick={() => setShowReportModal(true)} title="Generate a filtered report as PDF or XLSX">📄 Report</button>
-
-          {/* Admin: Edit & Delete */}
+          <button className="btn btn-outline btn-sm" onClick={() => setShowReportModal(true)}>📄 Report</button>
           {isAdmin && (
             <>
-              <div style={{ width: 1, height: 28, background: 'var(--border)', margin: '0 2px' }} />
-              <button className="btn btn-outline btn-sm"
-                style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
-                onClick={() => setShowEditProject(true)}
-                title="Edit Project">✏ Edit</button>
-              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)} title="Delete Project">🗑 Delete</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setShowEditProject(true)}>✏ Edit</button>
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
             </>
           )}
         </div>
