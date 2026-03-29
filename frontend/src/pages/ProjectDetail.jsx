@@ -553,20 +553,20 @@ ${project.installments.length > 0 ? `
                 <span className="badge badge-green">{reimbursedExp.length} Reimbursed</span>
               </div>
             </div>
-            <div className="filter-bar no-print" style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: 8 }}>
-              <div className="filter-field" style={{ flex: 2, minWidth: 140 }}>
+            <div className="filter-bar no-print">
+              <div className="filter-field filter-field-search">
                 <input className="form-input" placeholder="Search description, researcher, category…"
-                  value={expSearch} onChange={e => setExpSearch(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }} />
+                  value={expSearch} onChange={e => setExpSearch(e.target.value)} />
               </div>
               <div className="filter-field">
-                <select className="form-select" value={expStatus} onChange={e => setExpStatus(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
+                <select className="form-select" value={expStatus} onChange={e => setExpStatus(e.target.value)}>
                   <option value="">All Status</option>
                   <option value="pending">Pending Only</option>
                   <option value="reimbursed">Reimbursed Only</option>
                 </select>
               </div>
               <div className="filter-field">
-                <select className="form-select" value={expSort} onChange={e => setExpSort(e.target.value)} style={{ padding: '7px 10px', fontSize: 13 }}>
+                <select className="form-select" value={expSort} onChange={e => setExpSort(e.target.value)}>
                   <option value="date_desc">Newest First</option>
                   <option value="date_asc">Oldest First</option>
                   <option value="amount_desc">Highest Amount</option>
@@ -574,15 +574,20 @@ ${project.installments.length > 0 ? `
                   <option value="name">Researcher A–Z</option>
                 </select>
               </div>
-              <div className="filter-field" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div className="filter-field filter-field-date">
+                <label className="form-label">From date</label>
                 <input type="date" className="form-input" value={expFrom || ''} onChange={e => setExpFrom(e.target.value)}
-                  style={{ padding: '7px 10px', fontSize: 13 }} title="From date" />
-                <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>—</span>
+                  data-placeholder="dd/mm/yyyy" />
+              </div>
+              <div className="filter-field filter-field-date">
+                <label className="form-label">To date</label>
                 <input type="date" className="form-input" value={expTo || ''} onChange={e => setExpTo(e.target.value)}
-                  style={{ padding: '7px 10px', fontSize: 13 }} title="To date" />
+                  data-placeholder="dd/mm/yyyy" />
               </div>
               {(expSearch || expStatus || expFrom || expTo) && (
-                <button className="btn btn-ghost btn-xs" onClick={() => { setExpSearch(''); setExpStatus(''); setExpFrom(''); setExpTo(''); }}>✕ Clear</button>
+                <div className="filter-field filter-field-clear">
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setExpSearch(''); setExpStatus(''); setExpFrom(''); setExpTo(''); }}>✕ Clear</button>
+                </div>
               )}
             </div>
 

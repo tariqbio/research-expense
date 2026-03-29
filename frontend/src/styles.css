@@ -510,6 +510,19 @@ input[type="date"].form-input[value=""]:not(:focus) { color: var(--text-tertiary
 input[type="date"].form-input::-webkit-datetime-edit { color: inherit; }
 input[type="date"].form-input::-webkit-datetime-edit-fields-wrapper { color: inherit; }
 input[type="date"].form-input::-webkit-calendar-picker-indicator { opacity: 0.5; cursor: pointer; }
+/* Show dd/mm/yyyy placeholder on mobile where date inputs render as text */
+input[type="date"].form-input:not([value]):not(:focus)::-webkit-datetime-edit-text,
+input[type="date"].form-input:not([value]):not(:focus)::-webkit-datetime-edit-month-field,
+input[type="date"].form-input:not([value]):not(:focus)::-webkit-datetime-edit-day-field,
+input[type="date"].form-input:not([value]):not(:focus)::-webkit-datetime-edit-year-field { color: var(--text-tertiary); }
+/* Wrapper-based placeholder for browsers that fall back to text input on mobile */
+input[type="date"].form-input[value=""]:not(:focus) { color: var(--text-tertiary); }
+input[type="date"].form-input[data-placeholder]:not([value]):not(:focus)::before,
+input[type="date"].form-input[data-placeholder][value=""]:not(:focus)::before {
+  content: attr(data-placeholder);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
 .form-textarea { resize:vertical; min-height:88px; }
 .form-row { display:grid; gap:14px; grid-template-columns:1fr 1fr; }
 .form-hint  { font-size:11.5px; color:var(--text-tertiary); margin-top:4px; }
@@ -573,10 +586,17 @@ input[type="date"].form-input::-webkit-calendar-picker-indicator { opacity: 0.5;
 /* ─────────────────────────────────────────────────────────
    FILTER BAR
 ───────────────────────────────────────────────────────── */
-.filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; padding:14px 20px; background:var(--bg-subtle); border-bottom:1px solid var(--border); }
+.filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; padding:12px 18px; background:var(--bg-subtle); border-bottom:1px solid var(--border); }
 .filter-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
-.filter-field .form-label { margin-bottom:0; font-size:11px; }
-.filter-field .form-select,.filter-field .form-input { width:auto; min-width:120px; max-width:200px; padding:7px 10px; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; }
+.filter-field .form-label { margin-bottom:0; font-size:11px; color:var(--text-tertiary); font-weight:600; letter-spacing:0.03em; }
+.filter-field .form-select,.filter-field .form-input { width:auto; min-width:130px; max-width:220px; padding:7px 10px; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; }
+/* Search stretches to fill available space */
+.filter-field-search { flex:1 1 180px; }
+.filter-field-search .form-input { width:100%; max-width:none; min-width:0; }
+/* Date fields: fixed compact width */
+.filter-field-date .form-input { min-width:130px; max-width:150px; }
+/* Clear button aligns to bottom */
+.filter-field-clear { justify-content:flex-end; }
 
 /* ─────────────────────────────────────────────────────────
    MEMBER CARDS
@@ -847,21 +867,29 @@ input[type="date"].form-input::-webkit-calendar-picker-indicator { opacity: 0.5;
   .filter-bar {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    padding: 12px 14px !important;
+    gap: 8px;
+    padding: 12px 12px !important;
     align-items: end;
   }
   /* Search field spans full width */
-  .filter-bar > .filter-field:first-child { grid-column: 1 / -1; }
-  .filter-field { width: 100%; min-width: 0; }
+  .filter-bar > .filter-field:first-child,
+  .filter-bar > .filter-field-search { grid-column: 1 / -1; }
+  .filter-field,
+  .filter-field-date,
+  .filter-field-clear { width: 100%; min-width: 0; }
   .filter-field .form-select,
-  .filter-field .form-input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .filter-field .form-input,
+  .filter-field-date .form-input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  /* Date fields each take one column */
+  .filter-field-date { grid-column: span 1; }
+  /* Clear button spans full width on mobile */
+  .filter-field-clear { grid-column: 1 / -1; }
 
   /* Table scrolls horizontally, no content overlap */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; display: block; width: 100%; }
-  .table-wrap table { min-width: 780px; }
-  tbody td { font-size: 11px; padding: 8px 8px; }
-  thead th { padding: 7px 8px; font-size: 9px; }
+  .table-wrap table { min-width: 820px; }
+  tbody td { font-size: 11.5px; padding: 10px 8px; line-height: 1.5; vertical-align: middle; }
+  thead th { padding: 8px 8px; font-size: 9px; }
 
   /* Tabs scroll instead of wrap */
   .tabs { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
