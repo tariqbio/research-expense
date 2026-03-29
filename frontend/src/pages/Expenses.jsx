@@ -337,15 +337,15 @@ export default function Expenses() {
             <div className="table-wrap">
               <table style={{ tableLayout: 'fixed', width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                 <colgroup>
-                  <col style={{ width: '7.5%' }} />
-                  <col style={{ width: '10.5%' }} />
-                  <col style={{ width: '10.5%' }} />
-                  <col style={{ width: '10.5%' }} />
-                  <col style={{ width: '24%' }} />
-                  <col style={{ width: '10.5%' }} />
-                  <col style={{ width: '8%' }} />
-                  {isAdmin && <col style={{ width: '7%' }} />}
-                  <col style={{ width: '11%' }} className="no-print" />
+                  <col style={{ width: '8%' }} />           {/* Date */}
+                  <col style={{ width: '11%' }} />          {/* Project */}
+                  <col style={{ width: '11%' }} />          {/* Submitted By */}
+                  <col style={{ width: '11%' }} />          {/* Category */}
+                  <col style={{ width: '24%' }} />          {/* Description */}
+                  <col style={{ width: '11%' }} />          {/* Amount */}
+                  <col style={{ width: '9%' }} />           {/* Status */}
+                  {isAdmin && <col style={{ width: '7%' }} />}  {/* Source (admin) */}
+                  <col style={{ width: isAdmin ? '8%' : '15%' }} className="no-print" />  {/* Actions */}
                 </colgroup>
                 <thead>
                   <tr>
@@ -384,19 +384,15 @@ export default function Expenses() {
                           : <span className="badge badge-amber" style={{ fontSize:10, padding:'2px 5px' }}>Pending</span>}
                       </td>
                       {isAdmin && <td style={{ padding:'8px 6px', fontSize:11, color:'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'Univ.' : 'Proj.') : '—'}</td>}
-                      <td className="no-print" style={{ padding:'6px 8px' }}>
-                        <div style={{ display:'flex', gap:4 }}>
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color:'var(--accent)', border:'1px solid var(--accent-mid)', fontSize:11, padding:'3px 7px' }}
-                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏ Edit</button>
-                          )}
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color:'var(--danger)', border:'1px solid var(--danger)', fontSize:11, padding:'3px 7px' }}
-                              onClick={() => handleDelete(e.id)}>🗑</button>
-                          )}
-                        </div>
+                      <td className="no-print" style={{ padding:'4px 4px', textAlign:'center' }}>
+                        <ActionMenu items={[
+                          ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                            { label: '✏ Edit', onClick: () => { setEditExpense(e); setShowModal(true); } },
+                          ] : []),
+                          ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                            { label: '🗑 Delete', onClick: () => handleDelete(e.id), danger: true },
+                          ] : []),
+                        ]} />
                       </td>
                     </tr>
                   ))}

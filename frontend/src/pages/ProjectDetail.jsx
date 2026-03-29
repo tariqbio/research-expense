@@ -618,7 +618,7 @@ ${project.installments.length > 0 ? `
                         {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                         <td className="no-print">
                           {reimbursing === e.id ? (
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                               <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
                                 value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
                                 <option value="university">University</option>
@@ -628,23 +628,18 @@ ${project.installments.length > 0 ? `
                               <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
                             </div>
                           ) : (
-                            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                              {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                                <button className="btn btn-ghost btn-xs"
-                                  style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)', fontSize: 11, padding: '3px 7px' }}
-                                  onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
-                              )}
-                              {isAdmin && !e.reimbursed && (
-                                <button className="btn btn-success btn-xs"
-                                  style={{ fontSize: 11, padding: '3px 7px' }}
-                                  onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>✓ Paid</button>
-                              )}
-                              {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                                <button className="btn btn-ghost btn-xs"
-                                  style={{ color: 'var(--danger)', border: '1px solid var(--danger)', fontSize: 11, padding: '3px 7px' }}
-                                  onClick={() => handleDeleteExpense(e.id)}>🗑</button>
-                              )}
-                            </div>
+                            <ActionMenu items={[
+                              ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                                { label: '✏ Edit', onClick: () => { setEditExpense(e); setShowExpModal(true); } },
+                              ] : []),
+                              ...(isAdmin && !e.reimbursed ? [
+                                { label: '✓ Mark Paid', onClick: () => { setReimbursing(e.id); setReimburseFrom('university'); }, success: true },
+                              ] : []),
+                              ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                                'divider',
+                                { label: '🗑 Delete', onClick: () => handleDeleteExpense(e.id), danger: true },
+                              ] : []),
+                            ]} />
                           )}
                         </td>
                       </tr>
