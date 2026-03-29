@@ -8,6 +8,7 @@ import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import RowActions from '../components/RowActions';
 
+
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
 const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
@@ -79,6 +80,8 @@ export default function ProjectDetail() {
       load();
     } catch(e) { alert('Failed to update installment.'); }
   };
+
+
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────
   const handlePrint = () => {
@@ -471,16 +474,21 @@ ${project.installments.length > 0 ? `
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
         <div className="page-actions no-print">
-          <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print Report</button>
-          <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
-          {isAdmin && (
-            <button className="btn btn-outline btn-sm"
-              style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
-              onClick={() => setShowEditProject(true)}>✏ Edit</button>
-          )}
-          {isAdmin && (
-            <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑 Delete</button>
-          )}
+          <div className="page-actions-group">
+            <button className="btn btn-outline btn-sm" onClick={handlePrint}>🖨 Print</button>
+          </div>
+          {isAdmin && <div className="page-actions-divider" />}
+          <div className="page-actions-group">
+            <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
+            {isAdmin && (
+              <button className="btn btn-outline btn-sm"
+                style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+                onClick={() => setShowEditProject(true)}>✏ Edit</button>
+            )}
+            {isAdmin && (
+              <button className="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(true)}>🗑</button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -504,33 +512,33 @@ ${project.installments.length > 0 ? `
         <div className="stats-grid">
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
-            <div className="stat-note">{project.payment_type} payment</div>
+            <div className="stat-note">{project.payment_type?.charAt(0).toUpperCase() + project.payment_type?.slice(1)} Payment</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Funds Received</div><div className="stat-value" style={{ color: 'var(--info)' }}>{fmt(receivedFunds)}</div></div><div className="stat-icon si-teal">🏦</div></div>
             <div className="stat-note">
-              of {fmt(totalInstalled)} scheduled
+              Of {fmt(totalInstalled)} Scheduled
               {totalInstalled > 0 && <span style={{ marginLeft: 6, color: budget - receivedFunds > 0 ? 'var(--warning)' : 'var(--success)' }}>
-                · {fmt(budget - receivedFunds)} outstanding
+                · {fmt(budget - receivedFunds)} Outstanding
               </span>}
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Spent</div><div className="stat-value">{fmt(spent)}</div></div><div className="stat-icon si-blue">📈</div></div>
             <div className="progress"><div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} /></div>
-            <div className="stat-note">{pct.toFixed(1)}% of budget</div>
+            <div className="stat-note">{pct.toFixed(1)}% Of Budget</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Reimbursed</div><div className="stat-value green">{fmt(stats.total_reimbursed)}</div></div><div className="stat-icon si-green">✅</div></div>
-            <div className="stat-note">{reimbursedExp.length} expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{reimbursedExp.length} Expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Pending</div><div className="stat-value amber">{fmt(stats.total_pending)}</div></div><div className="stat-icon si-amber">⏳</div></div>
-            <div className="stat-note">{pendingExp.length} unpaid</div>
+            <div className="stat-note">{pendingExp.length} Unpaid</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Remaining</div><div className={`stat-value ${budget - spent < 0 ? 'red' : 'green'}`}>{fmt(budget - spent)}</div></div><div className="stat-icon si-green">📊</div></div>
-            <div className="stat-note">budget balance</div>
+            <div className="stat-note">Budget Balance</div>
           </div>
         </div>
 

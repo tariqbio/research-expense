@@ -333,15 +333,15 @@ body {
 /* ─────────────────────────────────────────────────────────
    STAT CARDS — true glassmorphism in both modes
 ───────────────────────────────────────────────────────── */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; margin-bottom: 24px; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 24px; }
 
 .stat-card {
   background: rgba(255,255,255,0.65);
   border: 1px solid rgba(40,233,140,0.25);
   box-shadow: 0 8px 32px rgba(40,233,140,0.10), inset 0 1px 0 rgba(255,255,255,0.80);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-  border-radius: var(--r-lg); padding: 20px 22px;
-  display: flex; flex-direction: column;
+  border-radius: var(--r-lg); padding: 22px 24px;
+  display: flex; flex-direction: column; gap: 2px;
   transition: all var(--t-md); animation: fadeUp 0.35s both;
 }
 
@@ -369,9 +369,9 @@ body {
 .stat-card:nth-child(3){animation-delay:.15s} .stat-card:nth-child(4){animation-delay:.20s}
 .stat-card:nth-child(5){animation-delay:.25s} .stat-card:nth-child(6){animation-delay:.30s}
 
-.stat-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; gap: 12px; }
+.stat-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 
-.stat-icon { width: 40px; height: 40px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.stat-icon { width: 44px; height: 44px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
 
 .si-blue   { background: #eff6ff; }
 .si-indigo { background: var(--accent-light); }
@@ -387,9 +387,9 @@ body {
 [data-theme="dark"] .si-red    { background: rgba(220,38,38,0.18); }
 [data-theme="dark"] .si-teal   { background: rgba(8,145,178,0.18); }
 
-.stat-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-secondary); margin-bottom: 6px; }
+.stat-label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 4px; }
 
-.stat-value { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1.1; margin-bottom: 2px; }
+.stat-value { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: var(--text-primary); line-height: 1.1; }
 .stat-value.green { color: var(--success); }
 .stat-value.amber { color: var(--warning); }
 .stat-value.red   { color: var(--danger); }
@@ -401,7 +401,7 @@ body {
 [data-theme="dark"] .stat-value.red    { color: #f87171; }
 [data-theme="dark"] .stat-value.indigo { color: #28e98c; }
 
-.stat-note { font-size: 13px; color: var(--text-secondary); margin-top: 10px; font-weight: 400; line-height: 1.4; }
+.stat-note { font-size: 13px; color: var(--text-secondary); margin-top: 6px; font-weight: 400; }
 
 /* ─────────────────────────────────────────────────────────
    PROGRESS
@@ -489,10 +489,10 @@ body {
    BUTTONS — accented hover states
 ───────────────────────────────────────────────────────── */
 .btn {
-  display:inline-flex; align-items:center; gap:8px; padding:9px 18px;
-  border-radius:var(--r); font-size:14px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; padding:8px 16px;
+  border-radius:var(--r); font-size:13.5px; font-weight:600; cursor:pointer;
   border:1px solid transparent; transition:all var(--t); font-family:var(--font);
-  text-decoration:none; letter-spacing:-0.01em; white-space:nowrap; line-height:1.2;
+  text-decoration:none; letter-spacing:-0.01em; white-space:nowrap;
 }
 
 .btn-primary { background:var(--accent); color:#0d1f17; border-color:var(--accent); box-shadow:0 2px 8px rgba(40,233,140,0.25); }
@@ -515,9 +515,9 @@ body {
 .btn-danger:hover { background:#b91c1c; box-shadow:0 6px 20px rgba(220,38,38,0.35); transform:translateY(-1px); }
 .btn-danger:active { transform:translateY(0); }
 
-.btn-sm  { padding:7px 14px; font-size:13px; gap:6px; }
-.btn-xs  { padding:5px 10px; font-size:12px; gap:5px; }
-.btn-icon{ padding:9px; gap:0; }
+.btn-sm  { padding:5px 12px; font-size:12px; }
+.btn-xs  { padding:3px 9px;  font-size:11px; }
+.btn-icon{ padding:8px; gap:0; }
 
 .export-bar { display:flex; gap:8px; align-items:center; }
 
@@ -822,8 +822,55 @@ tfoot td { padding:12px 16px; border-top:2px solid var(--border-strong); font-we
 .info-card-body  { font-size:12.5px; color:var(--text-secondary); line-height:1.65; }
 
 /* ─────────────────────────────────────────────────────────
-   PRINT
+   STICKY ACTIONS COLUMN — Edit/Delete always visible
 ───────────────────────────────────────────────────────── */
+.table-wrap { position: relative; }
+
+/* Stick the last th and td (actions column) to the right edge */
+.table-wrap table thead th:last-child,
+.table-wrap table tbody td:last-child,
+.table-wrap table tfoot td:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 3;
+}
+
+.table-wrap table thead th:last-child {
+  background: var(--bg-subtle);
+}
+
+.table-wrap table tbody td:last-child {
+  background: var(--bg-surface);
+}
+
+/* Add a subtle shadow on the left of the sticky column to signal it's pinned */
+.table-wrap table thead th:last-child::before,
+.table-wrap table tbody td:last-child::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 0;
+  bottom: 0;
+  width: 12px;
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.04));
+  pointer-events: none;
+}
+
+[data-theme="dark"] .table-wrap table tbody td:last-child {
+  background: var(--bg-surface);
+}
+[data-theme="dark"] .table-wrap table thead th:last-child {
+  background: var(--bg-subtle);
+}
+[data-theme="dark"] .table-wrap table thead th:last-child::before,
+[data-theme="dark"] .table-wrap table tbody td:last-child::before {
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.18));
+}
+
+/* Hover row background must also apply to sticky td */
+tbody tr:hover td:last-child {
+  background: var(--bg-subtle) !important;
+}
 @media print {
   .sidebar,.topbar,.btn,.export-bar,.no-print { display:none !important; }
   .main-wrapper { margin-left:0 !important; }
@@ -995,4 +1042,148 @@ tfoot td { padding:12px 16px; border-top:2px solid var(--border-strong); font-we
   .table-wrap { border-radius: 0; }
   tbody td { font-size: 12.5px; padding: 11px 10px; }
   thead th { font-size: 11.5px; padding: 9px 10px; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   SPACING & TYPOGRAPHY IMPROVEMENTS (v3 patch)
+───────────────────────────────────────────────────────── */
+
+/* Improved page header alignment */
+.page-header-left { flex: 1; min-width: 0; }
+
+
+
+/* Nav items — more padding, better icon spacing */
+.nav-item {
+  padding: 10px 14px;
+  gap: 12px;
+}
+.nav-item-icon {
+  width: 34px;
+  height: 34px;
+  font-size: 16px;
+}
+
+/* Table rows — more comfortable vertical padding */
+tbody td {
+  padding: 13px 16px;
+  font-size: 13.5px;
+}
+thead th {
+  padding: 12px 16px;
+  font-size: 11.5px;
+}
+
+/* Badge — slightly more padding */
+.badge {
+  padding: 4px 10px;
+  font-size: 12px;
+  gap: 5px;
+}
+
+/* Card header — more breathing room */
+.card-header {
+  padding: 16px 22px;
+}
+
+/* Filter bar — better spacing between fields */
+.filter-bar {
+  padding: 18px 22px;
+  gap: 14px;
+}
+.filter-field .form-select,
+.filter-field .form-input {
+  padding: 9px 12px;
+  font-size: 13.5px;
+  min-width: 150px;
+}
+
+/* Page body — more comfortable padding */
+.page-body {
+  padding: 22px 28px 32px;
+}
+
+/* Topbar — better label sizing */
+.topbar-date,
+.topbar-time {
+  font-size: 12.5px;
+}
+
+/* User role tag — proper casing handled in JS, fix display */
+.user-role {
+  font-size: 11.5px;
+  text-transform: none;
+}
+
+/* Section title casing fix */
+.section-title {
+  font-size: 14px;
+}
+
+
+
+/* ── Expenses page — prevent unnecessary horizontal scroll ── */
+/* Allow the filter bar to wrap gracefully instead of scroll */
+.filter-bar {
+  flex-wrap: wrap;
+}
+
+/* Wider filter fields on medium screens */
+@media (min-width: 901px) and (max-width: 1280px) {
+  .filter-field .form-select,
+  .filter-field .form-input {
+    min-width: 130px;
+  }
+}
+
+/* Table: reduce minimum column widths so fewer columns overflow on narrow viewports */
+table td:nth-child(2) { min-width: 120px; }
+table td:nth-child(5) { min-width: 140px; }
+
+/* ── Button spacing ── */
+.btn {
+  gap: 7px;
+  padding: 8px 17px;
+}
+.btn-sm {
+  padding: 6px 13px;
+  font-size: 12.5px;
+  gap: 6px;
+}
+
+/* ── Row-actions trigger — slightly larger hit area ── */
+.row-actions-trigger {
+  width: 32px;
+  height: 32px;
+}
+
+/* ── Mobile: stack page-actions below title, full-width ── */
+@media (max-width: 900px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .page-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .filter-bar {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .filter-field {
+    width: 100%;
+  }
+  .filter-field .form-select,
+  .filter-field .form-input {
+    width: 100%;
+    min-width: unset;
+  }
+  tbody td {
+    padding: 12px 12px;
+  }
+  thead th {
+    padding: 10px 12px;
+  }
 }
