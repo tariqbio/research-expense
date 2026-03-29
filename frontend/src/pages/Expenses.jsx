@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
 import ExpenseModal from '../components/ExpenseModal';
+import ActionMenu from '../components/ActionMenu';
 import { exportExpensesXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
@@ -91,7 +92,7 @@ export default function Expenses() {
           <h1 className="page-title">Expenses</h1>
           <p className="page-subtitle">
             {displayed.length} record{displayed.length !== 1 ? 's' : ''}
-            {hasF ? ' · filtered' : ' · all records'}
+            {hasF ? ' · Filtered' : ' · All Records'}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
@@ -111,21 +112,21 @@ export default function Expenses() {
               <div><div className="stat-label">Total (filtered)</div><div className="stat-value indigo">{fmt(totals.total)}</div></div>
               <div className="stat-icon si-indigo">💳</div>
             </div>
-            <div className="stat-note">{expenses.length} expense{expenses.length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{expenses.length} Expense{expenses.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top">
               <div><div className="stat-label">Reimbursed</div><div className="stat-value green">{fmt(totals.reimbursed)}</div></div>
               <div className="stat-icon si-green">✅</div>
             </div>
-            <div className="stat-note">{expenses.filter(e => e.reimbursed).length} paid</div>
+            <div className="stat-note">{expenses.filter(e => e.reimbursed).length} Paid</div>
           </div>
           <div className="stat-card">
             <div className="stat-top">
               <div><div className="stat-label">Pending</div><div className="stat-value amber">{fmt(totals.pending)}</div></div>
               <div className="stat-icon si-amber">⏳</div>
             </div>
-            <div className="stat-note">{expenses.filter(e => !e.reimbursed).length} unpaid</div>
+            <div className="stat-note">{expenses.filter(e => !e.reimbursed).length} Unpaid</div>
           </div>
         </div>
 
@@ -198,7 +199,7 @@ export default function Expenses() {
         <div className="card" ref={tableRef}>
           <div className="card-header">
             <span className="card-title">Expense Records</span>
-            <span className="card-meta">{displayed.length} entries</span>
+            <span className="card-meta">{displayed.length} Entries</span>
           </div>
           {loading ? (
             <div style={{ padding: 48, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
@@ -208,7 +209,7 @@ export default function Expenses() {
             <div className="empty-state">
               <div className="empty-icon">🧾</div>
               <h4>No expenses found</h4>
-              <p>No expense records match the current filters.</p>
+              <p>No Expense Records Match The Current Filters.</p>
             </div>
           ) : (
             <div className="table-wrap">
@@ -247,30 +248,26 @@ export default function Expenses() {
                       <td>{e.reimbursed ? <span className="badge badge-green">✓ Reimbursed</span> : <span className="badge badge-amber">Pending</span>}</td>
                       {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                       <td className="no-print">
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                              onClick={() => { setEditExpense(e); setShowModal(true); }}>✏ Edit</button>
-                          )}
-                          {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                            <button className="btn btn-ghost btn-xs"
-                              style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}
-                              onClick={() => handleDelete(e.id)}>🗑 Delete</button>
-                          )}
-                        </div>
+                        <ActionMenu items={[
+                          ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                            { label: '✏ Edit', onClick: () => { setEditExpense(e); setShowModal(true); } },
+                          ] : []),
+                          ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                            { label: '🗑 Delete', onClick: () => handleDelete(e.id), danger: true },
+                          ] : []),
+                        ]} />
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr>
-                    <td colSpan={isAdmin ? 5 : 5} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} records</td>
+                    <td colSpan={isAdmin ? 5 : 5} style={{ color: 'var(--text-secondary)' }}>Total · {displayed.length} Records</td>
                     <td className="td-amount">{fmt(totals.total)}</td>
                     <td colSpan={isAdmin ? 3 : 2}>
-                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(totals.reimbursed)}</span>
+                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(totals.reimbursed)} Reimbursed</span>
                       <span style={{ color: 'var(--text-tertiary)', margin: '0 8px' }}>·</span>
-                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totals.pending)} pending</span>
+                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totals.pending)} Pending</span>
                     </td>
                   </tr>
                 </tfoot>

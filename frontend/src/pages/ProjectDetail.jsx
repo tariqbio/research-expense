@@ -6,6 +6,7 @@ import ExpenseModal from '../components/ExpenseModal';
 import InstallmentModal from '../components/InstallmentModal';
 import ProjectModal from '../components/ProjectModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import ActionMenu from '../components/ActionMenu';
 import { exportProjectXlsx } from '../utils/exportXlsx';
 
 const fmt = n => '৳' + Number(n || 0).toLocaleString('en-BD', { minimumFractionDigits: 2 });
@@ -507,33 +508,33 @@ ${project.installments.length > 0 ? `
         <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Budget</div><div className="stat-value indigo">{fmt(budget)}</div></div><div className="stat-icon si-indigo">💰</div></div>
-            <div className="stat-note">{project.payment_type} payment</div>
+            <div className="stat-note">{project.payment_type} Payment</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Funds Received</div><div className="stat-value" style={{ color: 'var(--info)' }}>{fmt(receivedFunds)}</div></div><div className="stat-icon si-teal">🏦</div></div>
             <div className="stat-note">
-              of {fmt(totalInstalled)} scheduled
+              Of {fmt(totalInstalled)} Scheduled
               {totalInstalled > 0 && <span style={{ marginLeft: 6, color: budget - receivedFunds > 0 ? 'var(--warning)' : 'var(--success)' }}>
-                · {fmt(budget - receivedFunds)} outstanding
+                · {fmt(budget - receivedFunds)} Outstanding
               </span>}
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Total Spent</div><div className="stat-value">{fmt(spent)}</div></div><div className="stat-icon si-blue">📈</div></div>
             <div className="progress"><div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} /></div>
-            <div className="stat-note">{pct.toFixed(1)}% of budget</div>
+            <div className="stat-note">{pct.toFixed(1)}% Of Budget</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Reimbursed</div><div className="stat-value green">{fmt(stats.total_reimbursed)}</div></div><div className="stat-icon si-green">✅</div></div>
-            <div className="stat-note">{reimbursedExp.length} expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{reimbursedExp.length} Expense{reimbursedExp.length !== 1 ? 's' : ''}</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Pending</div><div className="stat-value amber">{fmt(stats.total_pending)}</div></div><div className="stat-icon si-amber">⏳</div></div>
-            <div className="stat-note">{pendingExp.length} unpaid</div>
+            <div className="stat-note">{pendingExp.length} Unpaid</div>
           </div>
           <div className="stat-card">
             <div className="stat-top"><div><div className="stat-label">Remaining</div><div className={`stat-value ${budget - spent < 0 ? 'red' : 'green'}`}>{fmt(budget - spent)}</div></div><div className="stat-icon si-green">📊</div></div>
-            <div className="stat-note">budget balance</div>
+            <div className="stat-note">Budget Balance</div>
           </div>
         </div>
 
@@ -556,8 +557,8 @@ ${project.installments.length > 0 ? `
             <div className="card-header">
               <span className="card-title">Expense Records</span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <span className="badge badge-amber">{pendingExp.length} pending</span>
-                <span className="badge badge-green">{reimbursedExp.length} reimbursed</span>
+                <span className="badge badge-amber">{pendingExp.length} Pending</span>
+                <span className="badge badge-green">{reimbursedExp.length} Reimbursed</span>
               </div>
             </div>
             <div className="filter-bar no-print" style={{ padding: '10px 18px', borderBottom: '1px solid var(--border)' }}>
@@ -617,45 +618,41 @@ ${project.installments.length > 0 ? `
                         <td>{e.reimbursed ? <span className="badge badge-green">✓ Paid</span> : <span className="badge badge-amber">Pending</span>}</td>
                         {isAdmin && <td style={{ fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{e.reimbursed ? (e.reimbursed_from === 'university' ? 'University' : 'Project') : '—'}</td>}
                         <td className="no-print">
-                          <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-                            {/* Edit — admin can always edit; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" style={{ color: 'var(--accent)', border: '1px solid var(--accent-mid)' }}
-                                onClick={() => { setEditExpense(e); setShowExpModal(true); }}>✏ Edit</button>
-                            )}
-                            {/* Mark Paid — admin only, only if not reimbursed */}
-                            {isAdmin && !e.reimbursed && (
-                              reimbursing === e.id ? (
-                                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-                                  <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
-                                    value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
-                                    <option value="university">University</option>
-                                    <option value="project">Project</option>
-                                  </select>
-                                  <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
-                                  <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
-                                </div>
-                              ) : (
-                                <button className="btn btn-success btn-xs" onClick={() => { setReimbursing(e.id); setReimburseFrom('university'); }}>Mark Paid</button>
-                              )
-                            )}
-                            {/* Delete — admin can always delete; member only if their own & not reimbursed */}
-                            {(isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) && (
-                              <button className="btn btn-ghost btn-xs" onClick={() => handleDeleteExpense(e.id)}
-                                style={{ color: 'var(--danger)', border: '1px solid var(--danger)' }}>🗑 Delete</button>
-                            )}
-                          </div>
+                          {reimbursing === e.id ? (
+                            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                              <select className="form-select" style={{ padding: '3px 6px', fontSize: 11, width: 'auto' }}
+                                value={reimburseFrom} onChange={ev => setReimburseFrom(ev.target.value)}>
+                                <option value="university">University</option>
+                                <option value="project">Project</option>
+                              </select>
+                              <button className="btn btn-success btn-xs" onClick={() => handleReimburse(e.id)}>✓ Confirm</button>
+                              <button className="btn btn-ghost btn-xs" onClick={() => setReimbursing(null)}>Cancel</button>
+                            </div>
+                          ) : (
+                            <ActionMenu items={[
+                              ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                                { label: '✏ Edit', onClick: () => { setEditExpense(e); setShowExpModal(true); } },
+                              ] : []),
+                              ...(isAdmin && !e.reimbursed ? [
+                                { label: '✓ Mark Paid', onClick: () => { setReimbursing(e.id); setReimburseFrom('university'); }, success: true },
+                              ] : []),
+                              ...((isAdmin || (!e.reimbursed && e.submitted_by === user?.id)) ? [
+                                'divider',
+                                { label: '🗑 Delete', onClick: () => handleDeleteExpense(e.id), danger: true },
+                              ] : []),
+                            ]} />
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                   <tfoot><tr>
-                    <td colSpan={isAdmin ? 4 : 4} style={{ color: 'var(--text-secondary)' }}>Total · {displayedExp.length} records</td>
+                    <td colSpan={isAdmin ? 4 : 4} style={{ color: 'var(--text-secondary)' }}>Total · {displayedExp.length} Records</td>
                     <td className="td-amount">{fmt(displayedExp.reduce((a,e)=>a+Number(e.amount),0))}</td>
                     <td colSpan={isAdmin ? 3 : 2}>
-                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))}</span>
+                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} Reimbursed</span>
                       <span style={{ color: 'var(--text-tertiary)', margin: '0 6px' }}>·</span>
-                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>!e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} pending</span>
+                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(displayedExp.filter(e=>!e.reimbursed).reduce((a,e)=>a+Number(e.amount),0))} Pending</span>
                     </td>
                   </tr></tfoot>
                 </table>
@@ -737,9 +734,9 @@ ${project.installments.length > 0 ? `
                     <td colSpan={2}>Total ({project.installments.length} installment{project.installments.length !== 1 ? 's' : ''})</td>
                     <td className="td-amount">{fmt(totalInstalled)}</td>
                     <td colSpan={isAdmin ? 4 : 3}>
-                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(receivedFunds)} received</span>
+                      <span style={{ color: 'var(--success)', fontWeight: 700 }}>{fmt(receivedFunds)} Received</span>
                       <span style={{ margin: '0 8px', color: 'var(--text-tertiary)' }}>·</span>
-                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totalInstalled - receivedFunds)} pending</span>
+                      <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{fmt(totalInstalled - receivedFunds)} Pending</span>
                     </td>
                   </tr></tfoot>
                 </table>
