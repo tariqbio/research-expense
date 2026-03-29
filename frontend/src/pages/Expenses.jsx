@@ -337,15 +337,15 @@ export default function Expenses() {
             <div className="table-wrap">
               <table style={{ tableLayout: 'fixed', width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                 <colgroup>
-                  <col style={{ width: '82px' }} />
-                  <col style={{ width: '98px' }} />
-                  <col style={{ width: '100px' }} />
-                  <col style={{ width: '96px' }} />
-                  <col />
-                  <col style={{ width: '90px' }} />
-                  <col style={{ width: '70px' }} />
-                  {isAdmin && <col style={{ width: '54px' }} />}
-                  <col style={{ width: '36px' }} className="no-print" />
+                  <col style={{ width: '7%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '28%' }} />
+                  <col style={{ width: '10%' }} />
+                  <col style={{ width: '8%' }} />
+                  {isAdmin && <col style={{ width: '7%' }} />}
+                  <col style={{ width: '3%' }} className="no-print" />
                 </colgroup>
                 <thead>
                   <tr>
