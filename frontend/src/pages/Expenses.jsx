@@ -258,19 +258,22 @@ export default function Expenses() {
             <span className="card-title">Filter & Search</span>
             {hasF && <button className="btn btn-ghost btn-sm" onClick={() => { setFilters({ project_id: '', user_id: '', reimbursed: '', category: '', from_date: '', to_date: '' }); setSearch(''); }}>✕ Clear all</button>}
           </div>
-          <div className="filter-bar">
-            <div className="filter-field" style={{ flex: 2 }}>
+          <div className="filter-grid">
+            {/* Row 1: Search — full width */}
+            <div className="filter-field fg-full">
               <label className="form-label">Search</label>
               <input className="form-input" placeholder="Description, project, member…"
                 value={search} onChange={e => setSearch(e.target.value)} />
             </div>
-            <div className="filter-field">
+            {/* Row 2: Project — full width */}
+            <div className="filter-field fg-full">
               <label className="form-label">Project</label>
               <select className="form-select" value={filters.project_id} onChange={e => setF('project_id', e.target.value)}>
                 <option value="">All projects</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </select>
             </div>
+            {/* Row 3: remaining filters */}
             {isAdmin && (
               <div className="filter-field">
                 <label className="form-label">Member</label>

@@ -253,6 +253,7 @@ body {
    PAGE HEADER
 ───────────────────────────────────────────────────────── */
 .page-header { padding: 24px 28px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.page-header-left { min-width: 0; flex: 1; }
 .page-eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--accent); margin-bottom: 4px; }
 .page-title { font-size: 22px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.03em; line-height: 1.2; margin-bottom: 4px; }
 .page-subtitle { font-size: 13px; color: var(--text-secondary); font-weight: 400; }
@@ -597,6 +598,12 @@ input[type="date"].form-input[data-placeholder][value=""]:not(:focus)::before {
 .filter-field[style*="flex:"] .form-input { max-width:none; width:100%; }
 /* Date inputs: compact enough to fit all fields on one row */
 .filter-field input[type="date"].form-input { min-width:110px; max-width:140px; }
+/* Grid layout for Expenses filter (Search → Project → rest) */
+.filter-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap:12px; padding:16px 20px; background:var(--bg-subtle); border-bottom:1px solid var(--border); }
+.filter-grid .filter-field { min-width:0; }
+.filter-grid .filter-field .form-select,
+.filter-grid .filter-field .form-input { width:100%; max-width:none; min-width:0; padding:7px 10px; font-size:12.5px; }
+.filter-grid .fg-full { grid-column: 1 / -1; }
 
 /* ─────────────────────────────────────────────────────────
    MEMBER CARDS
@@ -806,7 +813,7 @@ input[type="date"].form-input[data-placeholder][value=""]:not(:focus)::before {
   /* Keep section headers with their content */
   .card-header { page-break-after:avoid; }
   /* Ensure filter bar is fully hidden */
-  .filter-bar, .filter-field { display:none !important; }
+  .filter-bar, .filter-grid, .filter-field { display:none !important; }
   /* Remove overflow scroll so table renders fully */
   .table-wrap { overflow:visible !important; }
 }

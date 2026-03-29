@@ -470,7 +470,7 @@ ${project.installments.length > 0 ? `
           <h1 className="page-title" style={{ fontSize: 20 }}>{project.name}</h1>
           {project.description && <p className="page-subtitle">{project.description}</p>}
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }} className="no-print">
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'nowrap', flexShrink: 0 }} className="no-print">
           <button className="btn btn-primary btn-sm" onClick={() => { setEditExpense(null); setShowExpModal(true); }}>+ Add Expense</button>
           <button className="btn btn-outline btn-sm" onClick={() => setShowReportModal(true)}>📄 Report</button>
           {isAdmin && (
