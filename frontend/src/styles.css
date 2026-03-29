@@ -353,8 +353,12 @@ body {
   border: 1px solid rgba(40,233,140,0.20);
   box-shadow: 0 4px 24px rgba(40,233,140,0.08);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
-  border-radius: var(--r-lg); overflow: hidden;
+  border-radius: var(--r-lg);
+  /* overflow:hidden removed — it clips dropdown menus inside table rows */
 }
+/* Apply clipping only to children that need it (table scroll, card headers) */
+.card > .table-wrap { overflow-x: auto; border-radius: 0 0 var(--r-lg) var(--r-lg); }
+.card:has(.card-header) > .card-header:first-child { border-radius: var(--r-lg) var(--r-lg) 0 0; }
 
 [data-theme="dark"] .card {
   background: rgba(20,28,22,0.72);
@@ -563,9 +567,9 @@ tfoot td { padding:10px 14px; border-top:2px solid var(--border-strong); font-we
    FILTER BAR
 ───────────────────────────────────────────────────────── */
 .filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; padding:14px 20px; background:var(--bg-subtle); border-bottom:1px solid var(--border); }
-.filter-field { display:flex; flex-direction:column; gap:4px; }
+.filter-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
 .filter-field .form-label { margin-bottom:0; font-size:11px; }
-.filter-field .form-select,.filter-field .form-input { width:auto; min-width:140px; padding:7px 10px; font-size:12.5px; }
+.filter-field .form-select,.filter-field .form-input { width:auto; min-width:120px; max-width:200px; padding:7px 10px; font-size:12.5px; overflow:hidden; text-overflow:ellipsis; }
 
 /* ─────────────────────────────────────────────────────────
    MEMBER CARDS

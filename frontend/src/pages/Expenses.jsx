@@ -98,7 +98,7 @@ export default function Expenses() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }} className="no-print">
           <div className="export-bar">
             <button className="btn btn-outline btn-sm" onClick={handleExportCSV} title="Download expense data as Excel spreadsheet">📥 Download XLS</button>
-            <button className="btn btn-outline btn-sm" onClick={() => window.print()} title="Opens print dialog — choose 'Save as PDF' to download">🖨 Print / Save PDF</button>
+            <button className="btn btn-outline btn-sm" onClick={() => window.print()} title="Opens print dialog — press Ctrl+P or use your browser's print button, then choose 'Save as PDF'">🖨 Save as PDF <span style={{ fontSize: 10, opacity: 0.6, fontWeight: 400 }}>(print)</span></button>
           </div>
           <button className="btn btn-primary" onClick={() => { setEditExpense(null); setShowModal(true); }}>+ Submit Expense</button>
         </div>
@@ -144,7 +144,7 @@ export default function Expenses() {
             </div>
             <div className="filter-field">
               <label className="form-label">Project</label>
-              <select className="form-select" value={filters.project_id} onChange={e => setF('project_id', e.target.value)}>
+              <select className="form-select" value={filters.project_id} onChange={e => setF('project_id', e.target.value)} style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 <option value="">All projects</option>
                 {projects.map(p => <option key={p.id} value={p.id}>{p.code} — {p.name}</option>)}
               </select>
@@ -215,14 +215,14 @@ export default function Expenses() {
             <div>
               <table style={{ tableLayout: 'fixed', width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
                 <colgroup>
-                  <col style={{ width: '80px' }} />
-                  <col style={{ width: '108px' }} />
-                  <col style={{ width: '108px' }} />
-                  <col style={{ width: '108px' }} />
-                  <col />
-                  <col style={{ width: '96px' }} />
-                  <col style={{ width: '80px' }} />
-                  {isAdmin && <col style={{ width: '68px' }} />}
+                  <col style={{ width: '82px' }} />
+                  <col style={{ width: '100px' }} />
+                  <col style={{ width: '100px' }} />
+                  <col style={{ width: '100px' }} />
+                  <col style={{ width: 'auto', minWidth: '120px' }} />
+                  <col style={{ width: '88px' }} />
+                  <col style={{ width: '72px' }} />
+                  {isAdmin && <col style={{ width: '56px' }} />}
                   <col style={{ width: '36px' }} className="no-print" />
                 </colgroup>
                 <thead>
