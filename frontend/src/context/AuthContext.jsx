@@ -5,8 +5,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('rt_user')); }
-    catch { return null; }
+    try { return JSON.parse(localStorage.getItem('rt_user')); } catch { return null; }
   });
   const [loading, setLoading] = useState(true);
 
@@ -17,9 +16,7 @@ export function AuthProvider({ children }) {
         .then(r => { setUser(r.data); localStorage.setItem('rt_user', JSON.stringify(r.data)); })
         .catch(() => logout())
         .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    } else { setLoading(false); }
   }, []);
 
   const login = async (email, password) => {
@@ -36,8 +33,23 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const updateUser = (partial) => {
+    const updated = { ...user, ...partial };
+    setUser(updated);
+    localStorage.setItem('rt_user', JSON.stringify(updated));
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isAdmin: user?.role === 'admin' }}>
+    <AuthContext.Provider value={{
+      user,
+      login,
+      logout,
+      loading,
+      updateUser,
+      isAdmin:       user?.role === 'admin',
+      workspaceName: user?.workspace_name  || '',
+      reportHeader:  user?.report_header   || '',
+    }}>
       {children}
     </AuthContext.Provider>
   );

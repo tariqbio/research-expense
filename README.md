@@ -1,92 +1,54 @@
-# FGS Research Expense Tracker
+# ResearchTrack v9 — Workspace Edition
 
-A full-stack expense tracking system for research projects at DIU Faculty of Graduate Studies.
+A private research expense tracker. Each user gets their own isolated workspace.
+No university, no department — just your projects, your team, your data.
 
----
+## What changed from v8
 
-## 🚀 Deploy to Railway (Step-by-Step)
+- **Workspace model** — replaced "organization" with "workspace". Each person who registers
+  gets their own private space. Nobody else can see your data.
+- **2-step registration** — register with your details, then name your workspace and set
+  the report header (what appears on exported reports).
+- **Email verification** — workspace owner gets a verification email on signup via Gmail SMTP.
+- **Forgot password** — fully automated email reset. No admin involvement needed.
+- **Change password** — any logged-in user can change their own password from Profile page.
+- **Admin resets member password** — from Members page, one click.
+- **Workspace Settings page** — admin can update workspace name and report header anytime.
+- **Dynamic report header** — all exports (PDF and Excel) use your workspace's report header,
+  not a hardcoded "FGS" or any institution name.
+- **Profile page** — every user can update their name, position, and password.
 
-### Step 1 — Push to GitHub
-1. Create a new repository on [github.com](https://github.com)
-2. Upload all these files (drag & drop the folder, or use Git)
+## Setup
 
-### Step 2 — Create a Railway project
-1. Go to [railway.app](https://railway.app) and log in
-2. Click **New Project → Deploy from GitHub repo**
-3. Select your repository
+### 1. Environment variables (Render or Railway)
 
-### Step 3 — Add a PostgreSQL database
-1. Inside your Railway project, click **+ New**
-2. Choose **Database → Add PostgreSQL**
-3. Railway will auto-create a `DATABASE_URL` variable — it links automatically ✅
-
-### Step 4 — Set environment variables
-In your Railway service (the Node.js one, not the database), go to **Variables** and add:
-
-| Variable | Value |
-|---|---|
-| `JWT_SECRET` | Any long random string, e.g. `mySuperSecretKey2024!xK9pQ` |
-| `NODE_ENV` | `production` |
-
-> `DATABASE_URL` and `PORT` are set automatically by Railway — do NOT add them manually.
-
-### Step 5 — Run the database schema
-1. Click on your **PostgreSQL** service in Railway
-2. Go to the **Query** tab (or connect via the provided connection string)
-3. Copy and paste the contents of `backend/db/schema.sql` and run it
-
-That's it — Railway will build and deploy automatically on every push! 🎉
-
----
-
-## 🔑 Default Login
-
-| Field | Value |
-|---|---|
-| Email | `admin@fgs.diu.edu` |
-| Password | `Admin@1234` |
-
-**⚠️ Change the admin password after first login by having the admin re-create the account.**
-
----
-
-## 💻 Local Development
-
-```bash
-# 1. Install dependencies
-cd backend && npm install
-cd ../frontend && npm install
-
-# 2. Create backend/.env from the example
-cp backend/.env.example backend/.env
-# Edit backend/.env with your local PostgreSQL credentials
-
-# 3. Run the schema on your local DB
-psql $DATABASE_URL -f backend/db/schema.sql
-
-# 4. Start backend (port 4000)
-cd backend && npm run dev
-
-# 5. Start frontend (port 5173) in a new terminal
-cd frontend && npm run dev
-```
-
----
-
-## 📁 Project Structure
+Copy `.env.example` to `.env` and fill in:
 
 ```
-research-tracker/
-├── package.json          ← Root (Railway detects Node here)
-├── railway.toml          ← Build & start commands
-├── frontend/             ← React + Vite
-│   ├── src/
-│   └── package.json
-└── backend/              ← Express + PostgreSQL
-    ├── routes/
-    ├── middleware/
-    ├── db/
-    │   ├── schema.sql    ← Run this once on your DB
-    │   └── pool.js
-    └── server.js
+DATABASE_URL=...        # your Postgres URL
+JWT_SECRET=...          # long random string
+SMTP_USER=...           # your Gmail address
+SMTP_PASS=...           # Gmail App Password (16 chars, no spaces)
+EMAIL_FROM=ResearchTrack <your-gmail@gmail.com>
+APP_URL=https://your-app.onrender.com
+FRONTEND_URL=https://your-app.onrender.com
 ```
+
+### Gmail App Password (one time setup)
+1. Go to myaccount.google.com → Security → 2-Step Verification → App Passwords
+2. Select "Mail" → Generate
+3. Copy the 16-character password into SMTP_PASS (no spaces)
+
+### 2. Deploy
+Same as before — push to GitHub, Render auto-deploys.
+
+### 3. First use
+- Go to your app URL → Register
+- Enter your details → name your workspace → set report header
+- Verify your email → sign in
+- Add team members from the Members page
+- Create projects, assign members, start tracking
+
+## Upgrading from v7/v8
+The server auto-migrates existing data into a default workspace on first boot.
+All your existing projects and expenses are preserved.

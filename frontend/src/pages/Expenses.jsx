@@ -20,7 +20,7 @@ const CAT_BADGE = {
 const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (CAT_LABELS[e.category] || e.category);
 
 export default function Expenses() {
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, workspaceName, reportHeader } = useAuth();
   const [expenses, setExpenses]   = useState([]);
   const [projects, setProjects]   = useState([]);
   const [members, setMembers]     = useState([]);
@@ -85,7 +85,7 @@ export default function Expenses() {
   const handleExportCSV = (expList) => {
     exportExpensesXlsx({
       displayed: expList || displayedRef.current,
-      totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS,
+      totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS, orgName: reportHeader, orgShort: workspaceName,
     });
   };
 

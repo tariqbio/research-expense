@@ -20,7 +20,7 @@ const getCatLabel = e => e.category === 'other' ? (e.other_label || 'Other') : (
 
 export default function ProjectDetail() {
   const { id } = useParams();
-  const { isAdmin, user } = useAuth();
+  const { isAdmin, user, workspaceName, reportHeader } = useAuth();
   const navigate = useNavigate();
   const printRef = useRef(null);
 
@@ -91,7 +91,7 @@ export default function ProjectDetail() {
   // ── XLSX Export ─────────────────────────────────────────────────────────────
   const handleExportCSV = (expList) => {
     if (!project) return;
-    exportProjectXlsx({ project, expenses: expList || displayedExpRef.current, stats, getCatLabel, fmtDate });
+    exportProjectXlsx({ project, expenses: expList || displayedExpRef.current, stats, getCatLabel, fmtDate, orgName: reportHeader, orgShort: workspaceName });
   };
 
   // ── Print — proper A4 PDF report in a new tab ───────────────────────────

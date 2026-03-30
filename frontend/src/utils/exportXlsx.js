@@ -107,7 +107,7 @@ function downloadXls(html, filename) {
 // ─────────────────────────────────────────────────────────────────────────────
 // PROJECT DETAIL EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
-export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate }) {
+export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDate, orgName = "ResearchTrack", orgShort = "" }) {
   const budget     = N(project.total_budget);
   const spent      = N(stats.total_spent);
   const reimbursed = N(stats.total_reimbursed);
@@ -165,7 +165,7 @@ export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDa
   <table style="width:100%;margin-bottom:0">
     <tr>
       <td colspan="5" class="hdr-band">
-        Daffodil International University &nbsp;·&nbsp; Faculty of Graduate Studies
+        ${orgName}
       </td>
     </tr>
     <tr>
@@ -261,10 +261,10 @@ export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDa
   <table style="width:100%;margin-top:20px;border-top:1px solid #e5e7eb">
     <tr>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0">
-        ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University
+        ResearchTrack v2.0 &nbsp;·&nbsp; ${orgName}
       </td>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0;text-align:right">
-        Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 FGS, DIU
+        Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 ${orgShort}
       </td>
     </tr>
   </table>`;
@@ -277,7 +277,7 @@ export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDa
 // ─────────────────────────────────────────────────────────────────────────────
 // ALL-EXPENSES PAGE EXPORT
 // ─────────────────────────────────────────────────────────────────────────────
-export function exportExpensesXlsx({ displayed, totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS }) {
+export function exportExpensesXlsx({ displayed, totals, filters, projects, search, user, getCatLabel, fmtDate, CAT_LABELS, orgName = "ResearchTrack", orgShort = "" }) {
   const today    = new Date().toLocaleDateString('en-GB',
     { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const rate     = totals.total > 0
@@ -314,7 +314,7 @@ export function exportExpensesXlsx({ displayed, totals, filters, projects, searc
   <!-- HEADER -->
   <table style="width:100%">
     <tr><td colspan="2" class="hdr-band">
-      Daffodil International University &nbsp;·&nbsp; Faculty of Graduate Studies
+      ${orgName}
     </td></tr>
     <tr>
       <td style="padding:10px 10px 6px;font-size:16pt;font-weight:800;color:#0d1f17">
@@ -378,10 +378,10 @@ export function exportExpensesXlsx({ displayed, totals, filters, projects, searc
   <table style="width:100%;margin-top:20px;border-top:1px solid #e5e7eb">
     <tr>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0">
-        ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University
+        ResearchTrack v2.0 &nbsp;·&nbsp; ${orgName}
       </td>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0;text-align:right">
-        Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 FGS, DIU
+        Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 ${orgShort}
       </td>
     </tr>
   </table>`;
