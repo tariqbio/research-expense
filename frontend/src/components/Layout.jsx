@@ -3,19 +3,19 @@ import { useAuth } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 
 const NAV = [
-  { to: '/',         label: 'Dashboard',  icon: '📊', end: true },
-  { to: '/expenses', label: 'Expenses',   icon: '🧾' },
-  { to: '/profile',  label: 'My Profile', icon: '👤' },
+  { to:'/',         label:'Dashboard',   icon:'📊', end:true },
+  { to:'/expenses', label:'Expenses',    icon:'🧾' },
+  { to:'/profile',  label:'My Profile',  icon:'👤' },
 ];
 const ADMIN_NAV = [
-  { to: '/members',  label: 'Team Members', icon: '👥' },
-  { to: '/settings', label: 'Workspace',    icon: '⚙️' },
+  { to:'/members',  label:'Team Members', icon:'👥' },
+  { to:'/settings', label:'Workspace',    icon:'⚙️' },
 ];
 
 export default function Layout() {
-  const { user, logout, isAdmin, workspaceName, reportHeader } = useAuth();
-  const navigate  = useNavigate();
-  const location  = useLocation();
+  const { user, logout, isAdmin, isSuper, isSuperSwitch, workspaceName, reportHeader } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [theme, setTheme]         = useState(() => localStorage.getItem('rt-theme') || 'light');
   const [now, setNow]             = useState(new Date());
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,24 +27,41 @@ export default function Layout() {
     localStorage.setItem('rt-theme', theme);
   }, [theme]);
 
-  const clockStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  const dateStr  = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
-  const initials = user?.name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || '?';
+  const clockStr = now.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  const dateStr  = now.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short', year:'numeric' });
+  const initials = user?.name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || '?';
 
   const crumbMap = {
-    '/':          ['Overview', 'Dashboard'],
-    '/expenses':  ['Overview', 'Expenses'],
-    '/members':   ['Administration', 'Team Members'],
-    '/profile':   ['Account', 'My Profile'],
-    '/settings':  ['Administration', 'Workspace Settings'],
+    '/':          ['Overview',        'Dashboard'],
+    '/expenses':  ['Overview',        'Expenses'],
+    '/members':   ['Administration',  'Team Members'],
+    '/profile':   ['Account',         'My Profile'],
+    '/settings':  ['Administration',  'Workspace Settings'],
   };
   const crumbs = crumbMap[location.pathname] || ['Overview', 'Page'];
 
   return (
     <div className="app-shell">
+      {/* Super-switch banner */}
+      {isSuperSwitch && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:9999,
+          background:'#d97706', color:'#fff', padding:'6px 16px',
+          display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13,
+        }}>
+          <span>👁 Viewing as admin of <strong>{workspaceName}</strong> — you cannot see financial data</span>
+          <button onClick={logout}
+            style={{ background:'rgba(0,0,0,0.2)', border:'none', color:'#fff',
+                     padding:'4px 12px', borderRadius:6, cursor:'pointer', fontSize:12 }}>
+            ← Back to Super Panel
+          </button>
+        </div>
+      )}
+
       <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
-      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}
+        style={isSuperSwitch ? { marginTop:36 } : {}}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="sidebar-logo">R</div>
@@ -68,8 +85,7 @@ export default function Layout() {
           {NAV.map(item => (
             <NavLink key={item.to} to={item.to} end={item.end}
               className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
-              <span className="nav-item-icon">{item.icon}</span>
-              {item.label}
+              <span className="nav-item-icon">{item.icon}</span>{item.label}
             </NavLink>
           ))}
           {isAdmin && (
@@ -78,10 +94,18 @@ export default function Layout() {
               {ADMIN_NAV.map(item => (
                 <NavLink key={item.to} to={item.to}
                   className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
-                  <span className="nav-item-icon">{item.icon}</span>
-                  {item.label}
+                  <span className="nav-item-icon">{item.icon}</span>{item.label}
                 </NavLink>
               ))}
+            </>
+          )}
+          {isSuper && !isSuperSwitch && (
+            <>
+              <div className="nav-section-label">Platform</div>
+              <NavLink to="/super"
+                className={({ isActive }) => 'nav-item' + (isActive ? ' active' : '')}>
+                <span className="nav-item-icon">🌐</span>Super Panel
+              </NavLink>
             </>
           )}
         </nav>
@@ -89,64 +113,67 @@ export default function Layout() {
         <div className="sidebar-user">
           <div className="user-card">
             <div className="user-avatar">{initials}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex:1, minWidth:0 }}>
               <div className="user-name">{user?.name}</div>
-              <div className="user-role">{user?.role === 'admin' ? '⭐ Admin' : '👤 Researcher'}</div>
+              <div className="user-role">
+                {isSuperSwitch ? '👁 Viewing workspace' :
+                 isSuper       ? '🌐 Super Admin'       :
+                 isAdmin       ? '⭐ Admin'              : '👤 Researcher'}
+              </div>
               {user?.position && (
-                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', marginTop: 1,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize:10, color:'var(--text-tertiary)', marginTop:1,
+                              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {user.position}
                 </div>
               )}
             </div>
           </div>
           <button className="btn-signout" onClick={() => { logout(); navigate('/login'); }}>
-            ↩ Sign Out
+            {isSuperSwitch ? '← Back to Super' : '↩ Sign Out'}
           </button>
         </div>
 
         <div className="sidebar-footer">
           Developed by Tariqul Islam<br />
-          ResearchTrack v9 · 2025
+          ResearchTrack v10 · 2025
         </div>
       </aside>
 
-      <div className="main-wrapper">
+      <div className="main-wrapper" style={isSuperSwitch ? { marginTop:36 } : {}}>
         <header className="topbar">
-          <button className="hamburger-btn" onClick={() => setSidebarOpen(s => !s)}>☰</button>
+          <button className="hamburger-btn" onClick={() => setSidebarOpen(s=>!s)}>☰</button>
           <div className="topbar-breadcrumb">
-            <span>{crumbs[0]}</span>
-            <span className="topbar-sep">›</span>
+            <span>{crumbs[0]}</span><span className="topbar-sep">›</span>
             <span className="current">{crumbs[1]}</span>
           </div>
           <div className="topbar-actions">
             <div className="topbar-clock">
               <span className="topbar-date">{dateStr}</span>
-              <span className="topbar-time" style={{ fontVariantNumeric: 'tabular-nums' }}>🕐 {clockStr}</span>
+              <span className="topbar-time" style={{ fontVariantNumeric:'tabular-nums' }}>🕐 {clockStr}</span>
             </div>
             <button className="theme-toggle"
-              onClick={() => setTheme(t => t === 'light' ? 'dark' : 'light')}
+              onClick={() => setTheme(t => t==='light' ? 'dark' : 'light')}
               title="Toggle dark mode">
               {theme === 'light' ? '🌙' : '☀️'}
             </button>
           </div>
         </header>
 
-        <main style={{ flex: 1 }}><Outlet /></main>
+        <main style={{ flex:1 }}><Outlet /></main>
 
         <footer className="app-footer">
           <div className="footer-brand">
-            <span style={{ fontSize: 18 }}>📊</span>
+            <span style={{ fontSize:18 }}>📊</span>
             <div>
               <strong>{workspaceName || 'ResearchTrack'}</strong>
               {reportHeader && reportHeader !== workspaceName && (
-                <><span style={{ margin: '0 6px', color: 'var(--text-tertiary)' }}>·</span>
+                <><span style={{ margin:'0 6px', color:'var(--text-tertiary)' }}>·</span>
                 <span>{reportHeader}</span></>
               )}
             </div>
           </div>
           <div className="footer-right">
-            ResearchTrack v9 · Developed by Tariqul Islam<br />
+            ResearchTrack v10 · Developed by Tariqul Islam<br />
             © 2025 · All access is logged and audited
           </div>
         </footer>

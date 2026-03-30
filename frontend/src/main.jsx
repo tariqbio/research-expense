@@ -13,21 +13,23 @@ import Expenses       from './pages/Expenses';
 import Members        from './pages/Members';
 import Profile        from './pages/Profile';
 import Settings       from './pages/Settings';
+import SuperAdmin     from './pages/SuperAdmin';
 import Layout         from './components/Layout';
 import './styles.css';
 
-function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, loading } = useAuth();
+function ProtectedRoute({ children, adminOnly=false, superOnly=false }) {
+  const { user, loading, isAdmin, isSuper } = useAuth();
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
   if (!user)   return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/" replace />;
+  if (superOnly  && !isSuper) return <Navigate to="/"     replace />;
+  if (adminOnly  && !isAdmin) return <Navigate to="/"     replace />;
   return children;
 }
 
 function PublicRoute({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isSuper } = useAuth();
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
-  if (user)    return <Navigate to="/" replace />;
+  if (user) return <Navigate to={isSuper ? '/super' : '/'} replace />;
   return children;
 }
 
@@ -43,7 +45,14 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/reset-password"  element={<ResetPassword />} />
           <Route path="/verify-email"    element={<VerifyEmail />} />
 
-          {/* Protected */}
+          {/* Superadmin panel — no Layout wrapper, its own full page */}
+          <Route path="/super" element={
+            <ProtectedRoute superOnly>
+              <SuperAdmin />
+            </ProtectedRoute>
+          } />
+
+          {/* Regular app */}
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route index                element={<Dashboard />} />
             <Route path="projects/:id" element={<ProjectDetail />} />

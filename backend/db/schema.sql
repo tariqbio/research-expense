@@ -1,36 +1,43 @@
 -- ============================================================
--- ResearchTrack v9 — Workspace Model
+-- ResearchTrack v10
 -- ============================================================
 
--- Each registered user gets one workspace. Everything belongs to it.
+-- Workspaces — one per registered user (PI, Research Fellow, etc.)
 CREATE TABLE IF NOT EXISTS workspaces (
   id            SERIAL PRIMARY KEY,
-  name          VARCHAR(200) NOT NULL,        -- e.g. "Dr. Karim's Research Projects"
-  report_header VARCHAR(200),                 -- shown on reports, e.g. "FGS, DIU"
+  name          VARCHAR(200) NOT NULL,
+  report_header VARCHAR(200),
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Users — every user belongs to one workspace
+-- Users
 CREATE TABLE IF NOT EXISTS users (
   id                    SERIAL PRIMARY KEY,
-  workspace_id          INT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  workspace_id          INT REFERENCES workspaces(id) ON DELETE CASCADE,
   name                  VARCHAR(100) NOT NULL,
   email                 VARCHAR(150) UNIQUE NOT NULL,
   password              VARCHAR(255) NOT NULL,
-  role                  VARCHAR(10) NOT NULL DEFAULT 'member'
-                          CHECK (role IN ('admin', 'member')),
+  role                  VARCHAR(20) NOT NULL DEFAULT 'member'
+                          CHECK (role IN ('superadmin','admin','member')),
   position              VARCHAR(150),
-  -- email verification (for workspace owners who self-register)
-  email_verified        BOOLEAN NOT NULL DEFAULT FALSE,
+  designation           VARCHAR(150),
+  gender                VARCHAR(20),
+  blood_type            VARCHAR(5),
+  location              VARCHAR(200),
+  phone                 VARCHAR(30),
+  date_of_birth         DATE,
+  -- email / password reset
+  email_verified        BOOLEAN NOT NULL DEFAULT TRUE,
   email_verify_token    VARCHAR(64),
   email_verify_expires  TIMESTAMPTZ,
-  -- password reset
   reset_token           VARCHAR(64),
   reset_token_expires   TIMESTAMPTZ,
+  -- auto-logout: track last activity
+  last_active           TIMESTAMPTZ DEFAULT NOW(),
   created_at            TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Projects — scoped to workspace
+-- Projects
 CREATE TABLE IF NOT EXISTS projects (
   id            SERIAL PRIMARY KEY,
   workspace_id  INT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
@@ -102,24 +109,39 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 -- ============================================================
--- Safe migrations (idempotent — safe to re-run on existing DB)
+-- Safe migrations — run every boot, all idempotent
 -- ============================================================
-ALTER TABLE expenses ADD COLUMN IF NOT EXISTS other_label   VARCHAR(150);
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS position      VARCHAR(150);
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS email_verified       BOOLEAN NOT NULL DEFAULT FALSE;
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS email_verify_token   VARCHAR(64);
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS email_verify_expires TIMESTAMPTZ;
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS reset_token          VARCHAR(64);
-ALTER TABLE users    ADD COLUMN IF NOT EXISTS reset_token_expires  TIMESTAMPTZ;
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS other_label       VARCHAR(150);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS position          VARCHAR(150);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS designation       VARCHAR(150);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS gender            VARCHAR(20);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS blood_type        VARCHAR(5);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS location          VARCHAR(200);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS phone             VARCHAR(30);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS date_of_birth     DATE;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS email_verified    BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS email_verify_token    VARCHAR(64);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS email_verify_expires  TIMESTAMPTZ;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS reset_token           VARCHAR(64);
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS reset_token_expires   TIMESTAMPTZ;
+ALTER TABLE users    ADD COLUMN IF NOT EXISTS last_active           TIMESTAMPTZ DEFAULT NOW();
 
 DO $$ BEGIN
-  ALTER TABLE users ADD COLUMN workspace_id INT REFERENCES workspaces(id);
+  ALTER TABLE users    ADD COLUMN workspace_id INT REFERENCES workspaces(id);
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 DO $$ BEGIN
   ALTER TABLE projects ADD COLUMN workspace_id INT REFERENCES workspaces(id);
 EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- Expand role column to support superadmin
+DO $$ BEGIN
+  ALTER TABLE users DROP CONSTRAINT users_role_check;
+EXCEPTION WHEN undefined_object THEN NULL; END $$;
+ALTER TABLE users ADD CONSTRAINT users_role_check
+  CHECK (role IN ('superadmin','admin','member'));
+
+-- Fix expense category constraint
 DO $$ BEGIN
   ALTER TABLE expenses DROP CONSTRAINT expenses_category_check;
 EXCEPTION WHEN undefined_object THEN NULL; END $$;
