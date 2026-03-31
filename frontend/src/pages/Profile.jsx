@@ -51,6 +51,22 @@ export default function Profile() {
     } finally { setPwSaving(false); }
   };
 
+
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatar_url || '');
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) return alert('Image must be under 500KB');
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const b64 = ev.target.result;
+      setAvatarPreview(b64);
+      setProfile(p => ({ ...p, avatar_url: b64 }));
+    };
+    reader.readAsDataURL(file);
+  };
+
   const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',
     { day:'2-digit', month:'short', year:'numeric' }) : '—';
 
@@ -73,7 +89,13 @@ export default function Profile() {
                 width:72, height:72, borderRadius:'50%', background:'var(--accent)',
                 display:'flex', alignItems:'center', justifyContent:'center',
                 fontSize:26, fontWeight:700, color:'#fff', flexShrink:0,
-              }}>{initials}</div>
+                overflow:'hidden', cursor:'pointer', position:'relative',
+              }}>
+                {avatarPreview
+                  ? <img src={avatarPreview} alt="avatar"
+                      style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                  : initials}
+              </div>
               <div style={{ flex:1 }}>
                 <div style={{ fontSize:22, fontWeight:700, color:'var(--text-primary)' }}>{user?.name}</div>
                 <div style={{ fontSize:13, color:'var(--text-secondary)', marginTop:2 }}>{user?.email}</div>
@@ -110,7 +132,33 @@ export default function Profile() {
               )}
               <form onSubmit={saveProfile}>
                 <div className="form-group">
-                  <label className="form-label">Full Name</label>
+                  <label className="form-label">Profile Photo</label>
+                  <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
+                    {avatarPreview && (
+                      <img src={avatarPreview} alt="preview"
+                        style={{ width:48, height:48, borderRadius:'50%', objectFit:'cover',
+                                 border:'2px solid var(--border)' }} />
+                    )}
+                    <div>
+                      <input type="file" accept="image/*" id="avatar-upload"
+                        style={{ display:'none' }} onChange={handleAvatarChange} />
+                      <label htmlFor="avatar-upload" className="btn btn-outline btn-sm"
+                        style={{ cursor:'pointer' }}>
+                        {avatarPreview ? '📷 Change Photo' : '📷 Upload Photo'}
+                      </label>
+                      {avatarPreview && (
+                        <button type="button" className="btn btn-ghost btn-sm"
+                          style={{ marginLeft:8, color:'var(--danger)' }}
+                          onClick={() => { setAvatarPreview(''); setProfile(p=>({...p,avatar_url:''})); }}>
+                          Remove
+                        </button>
+                      )}
+                      <div className="form-hint" style={{ marginTop:4 }}>Max 500KB. JPG or PNG.</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="form-group">
+                <label className="form-label">Full Name</label>
                   <input className="form-input" value={profile.name}
                     onChange={e => setProfile(p=>({...p, name:e.target.value}))} required />
                 </div>

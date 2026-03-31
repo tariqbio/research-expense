@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import api from '../api';
 
 const fmtDate = d => new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -7,6 +8,7 @@ const COLORS = ['#4f46e5','#0891b2','#16a34a','#d97706','#dc2626','#7c3aed','#0f
 
 export default function Members() {
   const { user, workspaceName } = useAuth();
+  const navigate = useNavigate();
   const [members, setMembers]   = useState([]);
   const [pending, setPending]   = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -350,7 +352,7 @@ export default function Members() {
   );
 }
 
-function MemberCard({ m, i, isMe, onEdit, onResetPw, onDelete, colors }) {
+function MemberCard({ m, i, isMe, onEdit, onResetPw, onDelete, onView, colors }) {
   return (
     <div className="member-card" style={{ borderTop: `3px solid ${m.role === 'admin' ? 'var(--accent)' : 'var(--border-strong)'}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -372,6 +374,7 @@ function MemberCard({ m, i, isMe, onEdit, onResetPw, onDelete, colors }) {
         </div>
         {!isMe && (
           <div style={{ display: 'flex', gap: 6 }}>
+            <button className="btn btn-ghost btn-xs" onClick={onView}>Profile</button>
             <button className="btn btn-ghost btn-xs" onClick={onEdit}>Edit</button>
             <button className="btn btn-ghost btn-xs" onClick={onResetPw}>Reset PW</button>
             <button className="btn btn-ghost btn-xs" onClick={onDelete} style={{ color: 'var(--danger)' }}>Remove</button>

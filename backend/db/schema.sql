@@ -150,3 +150,6 @@ DO $$ BEGIN
     CHECK (category IN ('transportation','printing_stationery','field_work',
                         'communication','other','miscellaneous'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- v11 additions
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
