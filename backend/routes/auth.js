@@ -188,7 +188,7 @@ router.patch('/change-password', authenticate, async (req, res) => {
 // ── PATCH /api/auth/profile ──────────────────────────────────────
 // Every user can update their own profile
 router.patch('/profile', authenticate, async (req, res) => {
-  const { name, position, designation, gender, blood_type, location, phone, date_of_birth, avatar_url } = req.body;
+  const { name, position, designation, gender, blood_type, location, phone, date_of_birth } = req.body;
   try {
     const { rows } = await pool.query(
       `UPDATE users SET
@@ -199,14 +199,12 @@ router.patch('/profile', authenticate, async (req, res) => {
          blood_type   = COALESCE($5, blood_type),
          location     = COALESCE($6, location),
          phone        = COALESCE($7, phone),
-         date_of_birth= COALESCE($8, date_of_birth),
-         avatar_url   = COALESCE($9, avatar_url)
-       WHERE id=$10
+         date_of_birth= COALESCE($8, date_of_birth)
+       WHERE id=$9
        RETURNING id, name, email, role, position, designation, gender,
-                 blood_type, location, phone, date_of_birth, avatar_url, workspace_id`,
+                 blood_type, location, phone, date_of_birth, workspace_id`,
       [name||null, position||null, designation||null, gender||null,
-       blood_type||null, location||null, phone||null, date_of_birth||null,
-       avatar_url||null, req.user.id]
+       blood_type||null, location||null, phone||null, date_of_birth||null, req.user.id]
     );
     res.json(rows[0]);
   } catch { res.status(500).json({ error: 'Server error' }); }
@@ -323,50 +321,6 @@ router.delete('/users/:id', authenticate, adminOnly, async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'User not found' });
     res.json({ message: 'Member removed' });
-  } catch { res.status(500).json({ error: 'Server error' }); }
-});
-
-
-// ── PATCH /api/auth/change-email (superadmin only) ───────────────
-router.patch('/change-email', authenticate, async (req, res) => {
-  // Only superadmin can change their own email (no workspace admin above them to do it)
-  if (req.user.role !== 'superadmin')
-    return res.status(403).json({ error: 'Only superadmin can change email this way' });
-  const { new_email, password } = req.body;
-  if (!new_email || !password) return res.status(400).json({ error: 'new_email and password required' });
-  try {
-    const { rows } = await pool.query('SELECT * FROM users WHERE id=$1', [req.user.id]);
-    if (!await bcrypt.compare(password, rows[0].password))
-      return res.status(401).json({ error: 'Password is incorrect' });
-    const { rows: updated } = await pool.query(
-      'UPDATE users SET email=$1 WHERE id=$2 RETURNING id, email',
-      [new_email.toLowerCase().trim(), req.user.id]
-    );
-    res.json({ message: 'Email updated. Please sign in again.', email: updated[0].email });
-  } catch (err) {
-    if (err.code === '23505') return res.status(409).json({ error: 'Email already in use' });
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-
-// ── GET /api/auth/users/:id/profile — admin views a member's full profile ──
-router.get('/users/:id/profile', authenticate, async (req, res) => {
-  const { id } = req.params;
-  // Admin can view members in their own workspace
-  // Superadmin cannot view member profiles (privacy)
-  if (!['admin','member'].includes(req.user.role))
-    return res.status(403).json({ error: 'Access denied' });
-  try {
-    const { rows } = await pool.query(
-      `SELECT id, name, email, role, position, designation, gender,
-              blood_type, location, phone, date_of_birth, avatar_url,
-              last_active, created_at
-       FROM users WHERE id=$1 AND workspace_id=$2`,
-      [id, req.user.workspace_id]
-    );
-    if (!rows.length) return res.status(404).json({ error: 'User not found' });
-    res.json(rows[0]);
   } catch { res.status(500).json({ error: 'Server error' }); }
 });
 

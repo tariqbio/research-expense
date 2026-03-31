@@ -42,10 +42,26 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
+      {/* Super-switch banner */}
+      {isSuperSwitch && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:9999,
+          background:'#d97706', color:'#fff', padding:'6px 16px',
+          display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13,
+        }}>
+          <span>👁 Viewing as admin of <strong>{workspaceName}</strong> — you cannot see financial data</span>
+          <button onClick={logout}
+            style={{ background:'rgba(0,0,0,0.2)', border:'none', color:'#fff',
+                     padding:'4px 12px', borderRadius:6, cursor:'pointer', fontSize:12 }}>
+            ← Back to Super Panel
+          </button>
+        </div>
+      )}
+
       <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}
->
+        style={isSuperSwitch ? { marginTop:36 } : {}}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="sidebar-logo">R</div>
@@ -113,7 +129,7 @@ export default function Layout() {
             </div>
           </div>
           <button className="btn-signout" onClick={() => { logout(); navigate('/login'); }}>
-'↩ Sign Out'
+            {isSuperSwitch ? '← Back to Super' : '↩ Sign Out'}
           </button>
         </div>
 

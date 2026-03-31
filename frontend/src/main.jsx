@@ -14,8 +14,6 @@ import Members        from './pages/Members';
 import Profile        from './pages/Profile';
 import Settings       from './pages/Settings';
 import SuperAdmin     from './pages/SuperAdmin';
-import SuperProfile   from './pages/SuperProfile';
-import MemberProfile  from './pages/MemberProfile';
 import Layout         from './components/Layout';
 import './styles.css';
 
@@ -48,8 +46,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/verify-email"    element={<VerifyEmail />} />
 
           {/* Superadmin panel — no Layout wrapper, its own full page */}
-          <Route path="/super" element={<ProtectedRoute superOnly><SuperAdmin /></ProtectedRoute>} />
-          <Route path="/super/profile" element={<ProtectedRoute superOnly><SuperProfile /></ProtectedRoute>} />
+          <Route path="/super" element={
+            <ProtectedRoute superOnly>
+              <SuperAdmin />
+            </ProtectedRoute>
+          } />
 
           {/* Regular app */}
           <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -58,7 +59,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="expenses"     element={<Expenses />} />
             <Route path="profile"      element={<Profile />} />
             <Route path="members"      element={<ProtectedRoute adminOnly><Members /></ProtectedRoute>} />
-            <Route path="members/:id"   element={<ProtectedRoute adminOnly><MemberProfile /></ProtectedRoute>} />
             <Route path="settings"     element={<ProtectedRoute adminOnly><Settings /></ProtectedRoute>} />
           </Route>
 

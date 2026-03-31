@@ -10,7 +10,7 @@ export function AuthProvider({ children }) {
     try { return JSON.parse(localStorage.getItem('rt_user')); } catch { return null; }
   });
   const [loading, setLoading] = useState(true);
-
+  const [isSuperSwitch, setIsSuperSwitch] = useState(false);
 
   // Auto-logout on inactivity
   useEffect(() => {
@@ -53,17 +53,45 @@ export function AuthProvider({ children }) {
     localStorage.setItem('rt_token', data.token);
     localStorage.setItem('rt_user',  JSON.stringify(data.user));
     setUser(data.user);
-
+    setIsSuperSwitch(false);
     return data.user;
   };
 
   const logout = useCallback(() => {
-    localStorage.removeItem('rt_token');
-    localStorage.removeItem('rt_user');
-    setUser(null);
+    // If super-switch, restore original superadmin token
+    const originalToken = localStorage.getItem('rt_super_token');
+    const originalUser  = localStorage.getItem('rt_super_user');
+    if (originalToken && originalUser) {
+      localStorage.setItem('rt_token', originalToken);
+      localStorage.setItem('rt_user',  originalUser);
+      localStorage.removeItem('rt_super_token');
+      localStorage.removeItem('rt_super_user');
+      setUser(JSON.parse(originalUser));
+      setIsSuperSwitch(false);
+      window.location.href = '/super';
+    } else {
+      localStorage.removeItem('rt_token');
+      localStorage.removeItem('rt_user');
+      setUser(null);
+      setIsSuperSwitch(false);
+    }
   }, []);
 
+  const switchToWorkspace = async (workspaceId) => {
+    // Store current superadmin credentials before switching
+    localStorage.setItem('rt_super_token', localStorage.getItem('rt_token'));
+    localStorage.setItem('rt_super_user',  localStorage.getItem('rt_user'));
 
+    const { data } = await api.post(`/super/switch/${workspaceId}`);
+    localStorage.setItem('rt_token', data.token);
+    const newUser = { ...user, ...data.workspace,
+      workspace_id: workspaceId, workspace_name: data.workspace.name,
+      report_header: data.workspace.report_header, role: 'admin' };
+    localStorage.setItem('rt_user', JSON.stringify(newUser));
+    setUser(newUser);
+    setIsSuperSwitch(true);
+    window.location.href = '/';
+  };
 
   const updateUser = (partial) => {
     const updated = { ...user, ...partial };
@@ -72,7 +100,6 @@ export function AuthProvider({ children }) {
   };
 
   const isSuper = user?.role === 'superadmin';
-  const isSuperSwitch = false;
   const isAdmin = ['admin','superadmin'].includes(user?.role) || isSuperSwitch;
 
   return (
