@@ -273,8 +273,8 @@ body {
 
 .stat-card {
   background: rgba(255,255,255,0.65);
-  border: 1px solid rgba(0,0,0,0.09);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.90);
+  border: 1px solid rgba(40,233,140,0.25);
+  box-shadow: 0 8px 32px rgba(40,233,140,0.10), inset 0 1px 0 rgba(255,255,255,0.80);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border-radius: var(--r-lg); padding: 18px 20px;
   display: flex; flex-direction: column; gap: 2px;
@@ -283,7 +283,7 @@ body {
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.90);
+  box-shadow: 0 16px 40px rgba(40,233,140,0.16), inset 0 1px 0 rgba(255,255,255,0.80);
   border-color: rgba(40,233,140,0.40);
 }
 
@@ -351,9 +351,9 @@ body {
    CARDS
 ───────────────────────────────────────────────────────── */
 .card {
-  background: rgba(255,255,255,0.95);
-  border: 1px solid rgba(0,0,0,0.10);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
+  background: rgba(255,255,255,0.70);
+  border: 1px solid rgba(40,233,140,0.20);
+  box-shadow: 0 4px 24px rgba(40,233,140,0.08);
   backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
   border-radius: var(--r-lg);
   /* overflow:hidden removed — it clips dropdown menus inside table rows */
@@ -441,13 +441,13 @@ body {
 .btn-primary:hover { background:var(--accent-hover); border-color:var(--accent-hover); box-shadow:0 6px 20px rgba(40,233,140,0.40); transform:translateY(-1px); }
 .btn-primary:active { transform:translateY(0); }
 
-.btn-outline { background:transparent; color:var(--text-primary); border-color:rgba(0,0,0,0.22); }
+.btn-outline { background:transparent; color:var(--text-primary); border-color:var(--border-strong); }
 .btn-outline:hover { background:var(--accent-light); border-color:var(--accent); color:var(--accent); }
 
-.btn-ghost { background:transparent; color:var(--text-secondary); border-color:rgba(0,0,0,0.10); }
+.btn-ghost { background:transparent; color:var(--text-secondary); border-color:transparent; }
 .btn-ghost:hover { background:var(--accent-light); color:var(--accent); border-color:rgba(40,233,140,0.20); }
 
-.btn-secondary { background:var(--bg-subtle); color:var(--text-primary); border-color:rgba(0,0,0,0.18); }
+.btn-secondary { background:var(--bg-subtle); color:var(--text-primary); border-color:var(--border-strong); }
 .btn-secondary:hover { background:var(--bg-muted); border-color:var(--text-tertiary); }
 
 .btn-success { background:var(--success); color:#fff; border-color:var(--success); box-shadow:0 2px 8px rgba(22,163,74,0.25); }
