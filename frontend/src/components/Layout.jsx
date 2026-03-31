@@ -9,11 +9,12 @@ const NAV = [
 ];
 const ADMIN_NAV = [
   { to:'/members',  label:'Team Members', icon:'👥' },
+  { to:'/invites',  label:'Invitations',  icon:'✉️' },
   { to:'/settings', label:'Workspace',    icon:'⚙️' },
 ];
 
 export default function Layout() {
-  const { user, logout, isAdmin, isSuper, isSuperSwitch, workspaceName, reportHeader } = useAuth();
+  const { user, logout, isAdmin, isSuper, workspaceName, reportHeader } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [theme, setTheme]         = useState(() => localStorage.getItem('rt-theme') || 'light');
@@ -42,26 +43,10 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      {/* Super-switch banner */}
-      {isSuperSwitch && (
-        <div style={{
-          position:'fixed', top:0, left:0, right:0, zIndex:9999,
-          background:'#d97706', color:'#fff', padding:'6px 16px',
-          display:'flex', alignItems:'center', justifyContent:'space-between', fontSize:13,
-        }}>
-          <span>👁 Viewing as admin of <strong>{workspaceName}</strong> — you cannot see financial data</span>
-          <button onClick={logout}
-            style={{ background:'rgba(0,0,0,0.2)', border:'none', color:'#fff',
-                     padding:'4px 12px', borderRadius:6, cursor:'pointer', fontSize:12 }}>
-            ← Back to Super Panel
-          </button>
-        </div>
-      )}
-
       <div className={`sidebar-overlay${sidebarOpen ? ' open' : ''}`} onClick={() => setSidebarOpen(false)} />
 
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}
-        style={isSuperSwitch ? { marginTop:36 } : {}}>
+>
         <div className="sidebar-header">
           <div className="sidebar-brand">
             <div className="sidebar-logo">R</div>
@@ -116,9 +101,8 @@ export default function Layout() {
             <div style={{ flex:1, minWidth:0 }}>
               <div className="user-name">{user?.name}</div>
               <div className="user-role">
-                {isSuperSwitch ? '👁 Viewing workspace' :
-                 isSuper       ? '🌐 Super Admin'       :
-                 isAdmin       ? '⭐ Admin'              : '👤 Researcher'}
+                {isSuper  ? '🌐 Super Admin' :
+                 isAdmin  ? '⭐ Admin'        : '👤 Researcher'}
               </div>
               {user?.position && (
                 <div style={{ fontSize:10, color:'var(--text-tertiary)', marginTop:1,
@@ -129,7 +113,7 @@ export default function Layout() {
             </div>
           </div>
           <button className="btn-signout" onClick={() => { logout(); navigate('/login'); }}>
-            {isSuperSwitch ? '← Back to Super' : '↩ Sign Out'}
+'↩ Sign Out'
           </button>
         </div>
 

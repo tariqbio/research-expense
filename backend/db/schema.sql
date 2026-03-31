@@ -150,3 +150,52 @@ DO $$ BEGIN
     CHECK (category IN ('transportation','printing_stationery','field_work',
                         'communication','other','miscellaneous'));
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- v11 additions
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+
+-- ============================================================
+-- v12: Invite system
+-- ============================================================
+
+-- Pending signups (Way 1 — public registration, awaiting superadmin approval)
+CREATE TABLE IF NOT EXISTS pending_signups (
+  id              SERIAL PRIMARY KEY,
+  name            VARCHAR(100) NOT NULL,
+  email           VARCHAR(150) UNIQUE NOT NULL,
+  password        VARCHAR(255) NOT NULL,  -- hashed, ready to activate
+  workspace_name  VARCHAR(200) NOT NULL,
+  report_header   VARCHAR(200),
+  position        VARCHAR(150),
+  message         TEXT,                   -- optional note to superadmin
+  created_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Invite tokens (Way 2 — admin generates link, shares manually)
+CREATE TABLE IF NOT EXISTS invite_tokens (
+  id            SERIAL PRIMARY KEY,
+  token         VARCHAR(64) UNIQUE NOT NULL,
+  workspace_id  INT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  created_by    INT NOT NULL REFERENCES users(id),
+  email         VARCHAR(150) NOT NULL,    -- locked to this email
+  role          VARCHAR(10) NOT NULL DEFAULT 'member',
+  project_id    INT REFERENCES projects(id) ON DELETE SET NULL, -- optional: auto-join project
+  expires_at    TIMESTAMPTZ NOT NULL,
+  used_at       TIMESTAMPTZ,
+  used_by       INT REFERENCES users(id),
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Invite codes (Way 3 — admin generates code for a project, shares via WhatsApp etc)
+CREATE TABLE IF NOT EXISTS invite_codes (
+  id            SERIAL PRIMARY KEY,
+  code          VARCHAR(12) UNIQUE NOT NULL,  -- short, e.g. "FGS-XK29"
+  workspace_id  INT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  created_by    INT NOT NULL REFERENCES users(id),
+  project_id    INT REFERENCES projects(id) ON DELETE CASCADE,
+  max_uses      INT NOT NULL DEFAULT 20,
+  use_count     INT NOT NULL DEFAULT 0,
+  expires_at    TIMESTAMPTZ NOT NULL,
+  active        BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at    TIMESTAMPTZ DEFAULT NOW()
+);
