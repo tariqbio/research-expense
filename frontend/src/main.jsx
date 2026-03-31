@@ -27,6 +27,8 @@ function ProtectedRoute({ children, adminOnly=false, superOnly=false }) {
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
   if (!user)   return <Navigate to="/login" replace />;
   if (superOnly && !isSuper) return <Navigate to="/"     replace />;
+  // Superadmin should never be in the regular app — redirect to super panel
+  if (!superOnly && isSuper) return <Navigate to="/super" replace />;
   if (adminOnly && !isAdmin) return <Navigate to="/"     replace />;
   return children;
 }

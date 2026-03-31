@@ -15,6 +15,7 @@ const ADMIN_NAV = [
 
 export default function Layout() {
   const { user, logout, isAdmin, isSuper, workspaceName, reportHeader } = useAuth();
+  const isSuperSwitch = false; // removed feature
   const navigate = useNavigate();
   const location = useLocation();
   const [theme, setTheme]         = useState(() => localStorage.getItem('rt-theme') || 'light');
@@ -123,7 +124,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className="main-wrapper" style={isSuperSwitch ? { marginTop:36 } : {}}>
+      <div className="main-wrapper">
         <header className="topbar">
           <button className="hamburger-btn" onClick={() => setSidebarOpen(s=>!s)}>☰</button>
           <div className="topbar-breadcrumb">

@@ -199,3 +199,19 @@ CREATE TABLE IF NOT EXISTS invite_codes (
   active        BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ============================================================
+-- v12 cleanup: remove ghost "unapproved" users from old model
+-- These were from v9's pending approval system which is now replaced
+-- by the pending_signups table. Any user in the users table is real.
+-- ============================================================
+DO $$ BEGIN
+  -- Mark all existing real users as verified (they logged in before, they're real)
+  UPDATE users SET email_verified = TRUE WHERE email_verified = FALSE;
+
+  -- If there's an 'approved' column leftover from v9, drop it safely
+  ALTER TABLE users DROP COLUMN IF EXISTS approved;
+EXCEPTION WHEN others THEN NULL; END $$;
+
+-- Clean up any test/ghost data in pending_signups older than 90 days
+DELETE FROM pending_signups WHERE created_at < NOW() - INTERVAL '90 days';
