@@ -84,7 +84,7 @@ export default function Layout() {
               ))}
             </>
           )}
-          {isSuper && !isSuperSwitch && (
+          {isSuper && (
             <>
               <div className="nav-section-label">Platform</div>
               <a href="/super" style={{ textDecoration:'none' }}>
@@ -124,7 +124,7 @@ export default function Layout() {
         </div>
       </aside>
 
-      <div className="main-wrapper" style={isSuperSwitch ? { marginTop:36 } : {}}>
+      <div className="main-wrapper">
         <header className="topbar">
           <button className="hamburger-btn" onClick={() => setSidebarOpen(s=>!s)}>☰</button>
           <div className="topbar-breadcrumb">

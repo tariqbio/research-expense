@@ -69,7 +69,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
             {/* Superadmin only */}
             <Route path="/super"         element={<SuperRoute><SuperAdmin /></SuperRoute>} />
-            <Route path="/super/profile" element={<SuperRoute><SuperProfile /></SuperRoute>} />
 
             {/* Regular app — superadmin is redirected away by ProtectedRoute */}
             <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
