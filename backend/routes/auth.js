@@ -80,14 +80,6 @@ router.get('/pending-signups', authenticate, superOnly, async (req, res) => {
   } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
-// GET /api/auth/pending-signups/count
-router.get('/pending-signups/count', authenticate, superOnly, async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT COUNT(*) FROM pending_signups');
-    res.json({ count: parseInt(rows[0].count) });
-  } catch { res.status(500).json({ error: 'Server error' }); }
-});
-
 // POST /api/auth/pending-signups/:id/approve — superadmin approves
 router.post('/pending-signups/:id/approve', authenticate, superOnly, async (req, res) => {
   const { id } = req.params;
@@ -690,6 +682,14 @@ router.delete('/users/:id', authenticate, adminOnly, async (req, res) => {
     );
     if (!rows.length) return res.status(404).json({ error: 'User not found' });
     res.json({ message: 'Member removed' });
+  } catch { res.status(500).json({ error: 'Server error' }); }
+});
+
+// Pending signups count for superadmin dashboard
+router.get('/pending-signups/count', authenticate, superOnly, async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT COUNT(*) FROM pending_signups');
+    res.json({ count: parseInt(rows[0].count) });
   } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
