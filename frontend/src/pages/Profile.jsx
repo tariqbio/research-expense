@@ -57,12 +57,26 @@ export default function Profile() {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (file.size > 500 * 1024) return alert('Image must be under 500KB');
+    if (!file.type.startsWith('image/')) return alert('Please select an image file.');
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const b64 = ev.target.result;
-      setAvatarPreview(b64);
-      setProfile(p => ({ ...p, avatar_url: b64 }));
+      const img = new Image();
+      img.onload = () => {
+        // Compress: resize to max 300x300, JPEG quality 0.82
+        const MAX = 300;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+          else       { w = Math.round(w * MAX / h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const compressed = canvas.toDataURL('image/jpeg', 0.82);
+        setAvatarPreview(compressed);
+        setProfile(p => ({ ...p, avatar_url: compressed }));
+      };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
   };
@@ -153,7 +167,7 @@ export default function Profile() {
                           Remove
                         </button>
                       )}
-                      <div className="form-hint" style={{ marginTop:4 }}>Max 500KB. JPG or PNG.</div>
+                      <div className="form-hint" style={{ marginTop:4 }}>Any size — auto-compressed. JPG, PNG, WEBP.</div>
                     </div>
                   </div>
                 </div>
