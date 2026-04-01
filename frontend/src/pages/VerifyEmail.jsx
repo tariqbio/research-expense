@@ -15,7 +15,7 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <div className="login-page" style={{ justifyContent: 'center' }}>
+    <div className="login-page login-page--centered">
       <div className="login-panel" style={{ maxWidth: 420, margin: '0 auto' }}>
         {status === 'verifying' && <>
           <div className="login-logo">⏳</div>
@@ -35,7 +35,7 @@ export default function VerifyEmail() {
           <div className="login-logo">❌</div>
           <h1>Link expired</h1>
           <p className="tagline">This verification link is invalid or has expired. Please register again or contact your admin.</p>
-          <Link to="/register" className="btn btn-primary"
+          <Link to="/request-access" className="btn btn-primary"
             style={{ width: '100%', justifyContent: 'center', marginTop: 24, padding: '12px 16px', fontSize: 14, display: 'flex' }}>
             Register Again
           </Link>

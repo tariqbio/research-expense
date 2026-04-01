@@ -23,7 +23,7 @@ export default function ResetPassword() {
   };
 
   if (!token) return (
-    <div className="login-page" style={{ justifyContent: 'center' }}>
+    <div className="login-page login-page--centered">
       <div className="login-panel" style={{ maxWidth: 420, margin: '0 auto' }}>
         <div className="login-logo">❌</div>
         <h1>Invalid link</h1>
@@ -37,7 +37,7 @@ export default function ResetPassword() {
   );
 
   return (
-    <div className="login-page" style={{ justifyContent: 'center' }}>
+    <div className="login-page login-page--centered">
       <div className="login-panel" style={{ maxWidth: 420, margin: '0 auto' }}>
         <div className="login-logo">🔒</div>
         <h1>Set new password</h1>

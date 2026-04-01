@@ -105,7 +105,7 @@ export default function Login() {
 
         <div className="login-footer-text" style={{ marginTop: 20 }}>
           Don't have an account?{' '}
-          <Link to="/register" style={{ color: 'var(--accent)' }}>Create one</Link>
+          <Link to="/request-access" style={{ color: 'var(--accent)' }}>Request Access</Link>
         </div>
 
         <div className="login-footer-text">

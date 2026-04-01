@@ -15,7 +15,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="login-page" style={{ justifyContent: 'center' }}>
+    <div className="login-page login-page--centered">
       <div className="login-panel" style={{ maxWidth: 420, margin: '0 auto' }}>
         <div className="login-logo">🔑</div>
         <h1>{sent ? 'Check your inbox' : 'Forgot password?'}</h1>

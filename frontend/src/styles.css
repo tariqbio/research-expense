@@ -273,8 +273,13 @@ body {
 
 .stat-card {
   background: rgba(255,255,255,0.65);
-  border: 1px solid rgba(0,0,0,0.09);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.90);
+  border: 1px solid rgba(255,255,255,0.80);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.06),
+    0 4px 16px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border-radius: var(--r-lg); padding: 18px 20px;
   display: flex; flex-direction: column; gap: 2px;
@@ -289,6 +294,8 @@ body {
 
 /* FIX: Dark mode glass stat cards */
 [data-theme="dark"] .stat-card {
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 4px 24px rgba(0,0,0,0.40);
   background: rgba(20, 38, 28, 0.60);
   border: 1px solid rgba(40,233,140,0.22);
   box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(40,233,140,0.08);
@@ -351,13 +358,17 @@ body {
    CARDS
 ───────────────────────────────────────────────────────── */
 .card {
-  background: rgba(255,255,255,0.95);
-  border: 1px solid rgba(0,0,0,0.10);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(255,255,255,0.72);
+  border: 1px solid rgba(255,255,255,0.85);
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.06),
+    0 4px 24px rgba(0,0,0,0.07),
+    inset 0 1px 0 rgba(255,255,255,0.90);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-radius: var(--r-lg);
-  /* overflow:hidden removed — it clips dropdown menus inside table rows */
 }
+/* overflow:hidden removed — it clips dropdown menus inside table rows */
 /* Apply clipping only to children that need it (table scroll, card headers) */
 .card > .table-wrap { overflow-x: auto; border-radius: 0 0 var(--r-lg) var(--r-lg); }
 .card:has(.card-header) > .card-header:first-child { border-radius: var(--r-lg) var(--r-lg) 0 0; }
@@ -365,10 +376,14 @@ body {
 .card > .filter-bar { border-radius: 0; }
 
 [data-theme="dark"] .card {
-  background: rgba(20,28,22,0.72);
-  border: 1px solid rgba(40,233,140,0.16);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.35);
-  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  background: rgba(28,30,26,0.78);
+  border: 1px solid rgba(255,255,255,0.12);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 4px 32px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
 }
 
 .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -782,6 +797,47 @@ input[type="date"].form-input::-webkit-calendar-picker-indicator { opacity: 0.6;
 .info-card.amber  { border-left-color:var(--warning); background:var(--warning-bg); }
 .info-card-title { font-size:13px; font-weight:700; color:var(--text-primary); margin-bottom:6px; }
 .info-card-body  { font-size:12.5px; color:var(--text-secondary); line-height:1.65; }
+
+
+/* ── Dark mode button borders ─────────────────────────────── */
+[data-theme="dark"] .btn-outline {
+  border-color: rgba(255,255,255,0.22);
+  color: var(--text-primary);
+}
+[data-theme="dark"] .btn-outline:hover {
+  border-color: var(--accent);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+[data-theme="dark"] .btn-ghost {
+  border-color: rgba(255,255,255,0.10);
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .btn-ghost:hover {
+  border-color: rgba(40,233,140,0.30);
+  background: var(--accent-light);
+  color: var(--accent);
+}
+[data-theme="dark"] .btn-secondary {
+  border-color: rgba(255,255,255,0.18);
+  background: var(--bg-subtle);
+}
+
+/* Single-column centered auth pages (forgot password, reset, verify) */
+.login-page--centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  grid-template-columns: unset;
+}
+.login-page--centered .login-panel {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+  z-index: 1;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.12);
+}
 
 /* ─────────────────────────────────────────────────────────
    PRINT

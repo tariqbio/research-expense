@@ -188,9 +188,9 @@ export default function Invites() {
                       fontSize:12, fontFamily:'monospace', wordBreak:'break-all',
                       color:'var(--text-primary)', marginBottom:12, border:'1px solid var(--border)',
                     }}>
-                      {newLink.invite_link}
+                      {`${window.location.origin}/join?token=${newLink.token}`}
                     </div>
-                    <button className="btn btn-primary" onClick={() => copy(newLink.invite_link)}>
+                    <button className="btn btn-primary" onClick={() => copy(`${window.location.origin}/join?token=${newLink.token}`)}>
                       📋 Copy Link
                     </button>
                     <div style={{ fontSize:12, color:'var(--text-tertiary)', marginTop:10 }}>
@@ -326,7 +326,7 @@ export default function Invites() {
                         📋 Copy Code
                       </button>
                       <button className="btn btn-outline" style={{ flex:1 }}
-                        onClick={() => copy(newCode.join_link)}>
+                        onClick={() => copy(`${window.location.origin}/code/${newCode.code}`)}>
                         🔗 Copy Link
                       </button>
                     </div>
