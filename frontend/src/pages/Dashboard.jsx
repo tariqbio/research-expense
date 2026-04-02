@@ -35,12 +35,17 @@ export default function Dashboard() {
   };
   useEffect(() => { load(); }, []);
 
-  const totals = summary.reduce((a, p) => ({
-    budget:     a.budget     + Number(p.total_budget),
-    spent:      a.spent      + Number(p.total_spent),
-    reimbursed: a.reimbursed + Number(p.reimbursed),
-    pending:    a.pending    + Number(p.pending),
-  }), { budget:0, spent:0, reimbursed:0, pending:0 });
+  // Only sum money for ACTIVE projects — completed/on-hold stats are historical noise
+  const activeProjectIds = new Set(projects.filter(p => p.status === 'active').map(p => p.id));
+  const totals = summary.reduce((a, p) => {
+    if (!activeProjectIds.has(p.project_id)) return a;
+    return {
+      budget:     a.budget     + Number(p.total_budget),
+      spent:      a.spent      + Number(p.total_spent),
+      reimbursed: a.reimbursed + Number(p.reimbursed),
+      pending:    a.pending    + Number(p.pending),
+    };
+  }, { budget:0, spent:0, reimbursed:0, pending:0 });
 
   const pct = totals.budget > 0 ? Math.min(100, (totals.spent / totals.budget) * 100) : 0;
 
@@ -95,7 +100,7 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="stat-top">
               <div>
-                <div className="stat-label">Total Budget</div>
+                <div className="stat-label">Active Budget</div>
                 <div className="stat-value indigo">{fmt(totals.budget)}</div>
               </div>
               <div className="stat-icon si-indigo">💰</div>
@@ -106,7 +111,7 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="stat-top">
               <div>
-                <div className="stat-label">Total Spent</div>
+                <div className="stat-label">Active Spent</div>
                 <div className="stat-value">{fmt(totals.spent)}</div>
               </div>
               <div className="stat-icon si-blue">📈</div>
@@ -114,7 +119,7 @@ export default function Dashboard() {
             <div className="progress">
               <div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} />
             </div>
-            <div className="stat-note">{pct.toFixed(1)}% Of Total Budget Utilised</div>
+            <div className="stat-note">{pct.toFixed(1)}% Of Active Budget Utilised</div>
           </div>
 
           <div className="stat-card">
