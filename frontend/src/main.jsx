@@ -16,6 +16,7 @@ import Members        from './pages/Members';
 import MemberProfile  from './pages/MemberProfile';
 import Invites        from './pages/Invites';
 import Profile        from './pages/Profile';
+import Archive        from './pages/Archive';
 import Settings       from './pages/Settings';
 import SuperAdmin     from './pages/SuperAdmin';
 import Layout         from './components/Layout';
@@ -76,6 +77,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="projects/:id" element={<ProjectDetail />} />
               <Route path="expenses"     element={<Expenses />} />
               <Route path="profile"      element={<Profile />} />
+            <Route path="archive"      element={<Archive />} />
               <Route path="members"      element={<ProtectedRoute adminOnly><Members /></ProtectedRoute>} />
               <Route path="members/:id"  element={<ProtectedRoute adminOnly><MemberProfile /></ProtectedRoute>} />
               <Route path="invites"      element={<ProtectedRoute adminOnly><Invites /></ProtectedRoute>} />

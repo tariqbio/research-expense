@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 const NAV = [
   { to:'/',         label:'Dashboard',   icon:'📊', end:true },
   { to:'/expenses', label:'Expenses',    icon:'🧾' },
+  { to:'/archive',  label:'Archive',     icon:'🗂️' },
   { to:'/profile',  label:'My Profile',  icon:'👤' },
 ];
 const ADMIN_NAV = [
