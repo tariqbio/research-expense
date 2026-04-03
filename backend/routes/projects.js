@@ -30,7 +30,7 @@ router.get('/', authenticate, async (req, res) => {
         JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
         LEFT JOIN users u ON u.id = p.created_by
         LEFT JOIN expenses e ON e.project_id = p.id
-        WHERE p.workspace_id = $2
+        WHERE p.workspace_id = $2 AND p.archived = FALSE
         GROUP BY p.id, u.name ORDER BY p.created_at DESC`;
       params = [req.user.id, req.user.workspace_id];
     }
@@ -222,6 +222,60 @@ router.delete('/:id/installments/:iid', authenticate, adminOnly, async (req, res
   try {
     await pool.query('DELETE FROM fund_installments WHERE id = $1', [iid]);
     res.json({ message: 'Installment deleted' });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+
+// PATCH /api/projects/:id/archive — toggle archive status
+router.patch('/:id/archive', authenticate, adminOnly, async (req, res) => {
+  const { id } = req.params;
+  const { archived } = req.body; // true or false
+  try {
+    const { rows } = await pool.query(
+      `UPDATE projects SET
+         archived    = $1,
+         archived_at = CASE WHEN $1 THEN NOW() ELSE NULL END
+       WHERE id = $2 AND workspace_id = $3
+       RETURNING id, name, archived, archived_at`,
+      [!!archived, id, req.user.workspace_id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Project not found' });
+    res.json(rows[0]);
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// GET /api/projects/archived — list archived projects
+router.get('/archived', authenticate, async (req, res) => {
+  try {
+    let query, params;
+    if (req.user.role === 'admin') {
+      query = `
+        SELECT p.*, u.name AS created_by_name,
+          COALESCE(SUM(e.amount),0) AS total_spent,
+          COALESCE(SUM(CASE WHEN e.reimbursed THEN e.amount ELSE 0 END),0) AS total_reimbursed,
+          COALESCE(SUM(CASE WHEN NOT e.reimbursed THEN e.amount ELSE 0 END),0) AS total_pending
+        FROM projects p
+        LEFT JOIN users u ON u.id = p.created_by
+        LEFT JOIN expenses e ON e.project_id = p.id
+        WHERE p.workspace_id = $1 AND p.archived = TRUE
+        GROUP BY p.id, u.name ORDER BY p.archived_at DESC`;
+      params = [req.user.workspace_id];
+    } else {
+      query = `
+        SELECT p.*, u.name AS created_by_name,
+          COALESCE(SUM(e.amount),0) AS total_spent,
+          COALESCE(SUM(CASE WHEN e.reimbursed THEN e.amount ELSE 0 END),0) AS total_reimbursed,
+          COALESCE(SUM(CASE WHEN NOT e.reimbursed THEN e.amount ELSE 0 END),0) AS total_pending
+        FROM projects p
+        JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = $1
+        LEFT JOIN users u ON u.id = p.created_by
+        LEFT JOIN expenses e ON e.project_id = p.id
+        WHERE p.workspace_id = $2 AND p.archived = TRUE
+        GROUP BY p.id, u.name ORDER BY p.archived_at DESC`;
+      params = [req.user.id, req.user.workspace_id];
+    }
+    const { rows } = await pool.query(query, params);
+    res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 

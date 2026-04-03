@@ -35,18 +35,15 @@ function issueJwt(user, workspace) {
 
 // POST /api/auth/request-access
 router.post('/request-access', async (req, res) => {
-  const {
-    name, email, password, workspace_name, report_header,
-    position, message,
-    institution, department, academic_degree, research_area,
-    granting_agency, expected_fund_amt, publication_count, orcid_id
-  } = req.body;
+  const { name, email, password, workspace_name, report_header, position, message,
+          institution, funding_source, project_nature, research_area, role_in_project } = req.body;
   if (!name || !email || !password || !workspace_name)
     return res.status(400).json({ error: 'name, email, password and workspace_name are required' });
   if (password.length < 8)
     return res.status(400).json({ error: 'Password must be at least 8 characters' });
 
   try {
+    // Check not already registered
     const { rows: existing } = await pool.query(
       'SELECT id FROM users WHERE email=$1', [email.toLowerCase().trim()]
     );
@@ -57,22 +54,17 @@ router.post('/request-access', async (req, res) => {
     await pool.query(
       `INSERT INTO pending_signups
          (name, email, password, workspace_name, report_header, position, message,
-          institution, department, academic_degree, research_area,
-          granting_agency, expected_fund_amt, publication_count, orcid_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+          institution, funding_source, project_nature, research_area, role_in_project)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (email) DO UPDATE SET
-         name=$1, password=$3, workspace_name=$4,
-         report_header=$5, position=$6, message=$7,
-         institution=$8, department=$9, academic_degree=$10, research_area=$11,
-         granting_agency=$12, expected_fund_amt=$13, publication_count=$14,
-         orcid_id=$15, created_at=NOW()`,
+         name=$1, password=$3, workspace_name=$4, report_header=$5,
+         position=$6, message=$7, institution=$8, funding_source=$9,
+         project_nature=$10, research_area=$11, role_in_project=$12, created_at=NOW()`,
       [name.trim(), email.toLowerCase().trim(), hashed,
        workspace_name.trim(), (report_header||workspace_name).trim(),
        position||null, message||null,
-       institution||null, department||null, academic_degree||null, research_area||null,
-       granting_agency||null, expected_fund_amt||null,
-       publication_count ? parseInt(publication_count) : 0,
-       orcid_id||null]
+       institution||null, funding_source||null, project_nature||null,
+       research_area||null, role_in_project||null]
     );
     res.status(201).json({
       message: 'Access request submitted. You will be notified when approved.'
@@ -87,10 +79,9 @@ router.post('/request-access', async (req, res) => {
 router.get('/pending-signups', authenticate, superOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id,name,email,workspace_name,report_header,position,message,created_at,
-              institution,department,academic_degree,research_area,
-              granting_agency,expected_fund_amt,publication_count,orcid_id
-       FROM pending_signups ORDER BY created_at DESC`
+      `SELECT id,name,email,workspace_name,report_header,position,message,
+              institution,funding_source,project_nature,research_area,role_in_project,
+              created_at FROM pending_signups ORDER BY created_at DESC`
     );
     res.json(rows);
   } catch { res.status(500).json({ error: 'Server error' }); }
@@ -115,14 +106,9 @@ router.post('/pending-signups/:id/approve', authenticate, superOnly, async (req,
     );
     // Create admin user — already email-verified since superadmin approved
     await client.query(
-      `INSERT INTO users (workspace_id,name,email,password,role,position,email_verified,
-                          institution,department,academic_degree,research_area,
-                          granting_agency,expected_fund_amt,publication_count,orcid_id)
-       VALUES ($1,$2,$3,$4,'admin',$5,TRUE,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [ws[0].id, p.name, p.email, p.password, p.position,
-       p.institution||null, p.department||null, p.academic_degree||null, p.research_area||null,
-       p.granting_agency||null, p.expected_fund_amt||null,
-       p.publication_count||0, p.orcid_id||null]
+      `INSERT INTO users (workspace_id,name,email,password,role,position,email_verified)
+       VALUES ($1,$2,$3,$4,'admin',$5,TRUE)`,
+      [ws[0].id, p.name, p.email, p.password, p.position]
     );
     // Remove from pending
     await client.query('DELETE FROM pending_signups WHERE id=$1', [id]);

@@ -199,21 +199,20 @@ CREATE TABLE IF NOT EXISTS invite_codes (
   active        BOOLEAN NOT NULL DEFAULT TRUE,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
--- v15 additions: richer registration data
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS institution       VARCHAR(200);
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS department        VARCHAR(200);
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS academic_degree   VARCHAR(50);
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS research_area     VARCHAR(300);
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS granting_agency   VARCHAR(200);
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS expected_fund_amt VARCHAR(100);
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS publication_count INT DEFAULT 0;
-ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS orcid_id          VARCHAR(30);
 
-ALTER TABLE users ADD COLUMN IF NOT EXISTS institution       VARCHAR(200);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS department        VARCHAR(200);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS academic_degree   VARCHAR(50);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS research_area     VARCHAR(300);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS granting_agency   VARCHAR(200);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS expected_fund_amt VARCHAR(100);
-ALTER TABLE users ADD COLUMN IF NOT EXISTS publication_count INT DEFAULT 0;
-ALTER TABLE users ADD COLUMN IF NOT EXISTS orcid_id          VARCHAR(30);
+-- v15: project archiving
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ;
+
+-- v15: expanded pending_signups fields for lead data
+ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS institution   VARCHAR(200);
+ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS funding_source VARCHAR(100);
+ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS project_nature VARCHAR(100);
+ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS research_area  VARCHAR(200);
+ALTER TABLE pending_signups ADD COLUMN IF NOT EXISTS role_in_project VARCHAR(100);
+
+-- v15: same fields on users for profile completeness
+ALTER TABLE users ADD COLUMN IF NOT EXISTS institution    VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS funding_source VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS research_area  VARCHAR(200);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role_in_project VARCHAR(100);
