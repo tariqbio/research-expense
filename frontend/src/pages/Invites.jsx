@@ -143,10 +143,14 @@ export default function Invites() {
                   </div>
                   <form onSubmit={createLink}>
                     <div className="form-group">
-                      <label className="form-label">Their Email <span className="form-required">*</span></label>
+                      <label className="form-label">Their Email Address <span className="form-required">*</span></label>
                       <input type="email" className="form-input" placeholder="researcher@university.edu"
                         value={linkForm.email}
                         onChange={e=>setLinkForm(f=>({...f,email:e.target.value}))} required />
+                      <div className="form-hint">
+                        🔒 This email will be <strong>locked</strong> to the invite — the recipient cannot change it when they sign up.
+                        Make sure it's the email they check regularly.
+                      </div>
                     </div>
                     <div className="form-row">
                       <div className="form-group">

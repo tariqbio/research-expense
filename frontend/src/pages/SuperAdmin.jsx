@@ -49,6 +49,9 @@ export default function SuperAdmin() {
   const [approving, setApproving] = useState(null);
   const [rejecting, setRejecting] = useState(null);
   const [deleting, setDeleting]   = useState(null);
+  // Delete confirmation — requires typing workspace name
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
+  const [deleteInput, setDeleteInput]     = useState('');
   const [profileOpen, setProfileOpen] = useState(false);
 
   // Profile
@@ -110,14 +113,16 @@ export default function SuperAdmin() {
     finally { setRejecting(null); }
   };
 
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Delete workspace "${name}" permanently?\n\nAll users, projects, and expenses will be removed.`)) return;
+  const handleDeleteConfirmed = async () => {
+    if (!deleteConfirm) return;
+    const { id, name } = deleteConfirm;
     setDeleting(id);
     try {
       await api.delete(`/super/workspaces/${id}`);
       setWorkspaces(ws=>ws.filter(w=>w.id!==id));
       if (drillId===id) { setDrillId(null); setDrillData(null); }
-    } catch(e) { alert('Failed'); }
+      setDeleteConfirm(null); setDeleteInput('');
+    } catch(e) { alert('Failed to delete workspace.'); }
     finally { setDeleting(null); }
   };
 
@@ -280,16 +285,41 @@ export default function SuperAdmin() {
       <div style={{ flex:1, padding:'24px', maxWidth:1080, margin:'0 auto', width:'100%' }}>
 
         {/* Page header */}
-        <div style={{ marginBottom:20 }}>
-          <h1 style={{ margin:0, fontSize:22, fontWeight:700, color:'var(--text-primary)' }}>
-            Platform Control
-          </h1>
-          <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--text-tertiary)' }}>
-            {user?.email} · Financial data is private and not visible to you
-          </p>
+        <div style={{ marginBottom:20, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
+          <div>
+            <h1 style={{ margin:0, fontSize:22, fontWeight:700, color:'var(--text-primary)' }}>
+              Platform Control
+            </h1>
+            <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--text-tertiary)' }}>
+              {user?.email} · Financial data inside workspaces is private and not visible to you
+            </p>
+          </div>
+          <button
+            className="btn btn-outline btn-sm"
+            style={{ fontSize:12, display:'flex', alignItems:'center', gap:6, flexShrink:0 }}
+            onClick={() => {
+              if (!workspaces.length) return alert('No workspace data loaded yet.');
+              const rows = [
+                ['Workspace Name','Report Header','Owner','Owner Email','Institution','Members','Active Projects','Total Projects','Last Active','Created'],
+                ...workspaces.map(w => [
+                  w.name, w.report_header||'', w.admin_name||'', w.admin_email||'',
+                  w.admin_institution||'', parseInt(w.admin_count)+parseInt(w.member_count),
+                  w.active_project_count, w.total_project_count,
+                  w.last_active ? new Date(w.last_active).toLocaleDateString('en-GB') : 'Never',
+                  new Date(w.created_at).toLocaleDateString('en-GB'),
+                ])
+              ];
+              const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+              const blob = new Blob([csv], { type:'text/csv' });
+              const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+              a.download = `platform-summary-${new Date().toISOString().slice(0,10)}.csv`;
+              a.click();
+            }}>
+            📥 Export Workspace List (CSV)
+          </button>
         </div>
 
-        {/* ── Stats ───────────────────────────────────────── */}
+        {/* ── Stats (platform-health metrics relevant to SuperAdmin) ── */}
         {stats && (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',
                         gap:12, marginBottom:24 }}>
@@ -297,43 +327,42 @@ export default function SuperAdmin() {
               {
                 icon:'🏠', label:'Total Workspaces',
                 value: stats.total_workspaces,
-                sub: `${stats.workspaces_with_projects} with projects`,
-                note: parseInt(stats.ghost_workspaces)>0 ? `⚠ ${stats.ghost_workspaces} ghost` : null,
+                sub: `${stats.workspaces_with_projects} have active projects`,
                 color:'#7c3aed',
                 action: () => { setFilterType('all'); setTab('workspaces'); },
               },
               {
-                icon:'👤', label:'Workspace Owners',
-                value: stats.total_admins,
-                sub: 'Your real customers',
-                color:'#0891b2',
-                action: () => setTab('workspaces'),
-              },
-              {
-                icon:'👥', label:'Researchers',
-                value: stats.total_members,
-                sub: `${stats.active_users_7d} active this week`,
-                color:'#16a34a',
-              },
-              {
-                icon:'📁', label:'Active Projects',
-                value: stats.active_projects,
-                sub: `${stats.total_projects} total including archived`,
-                color:'#d97706',
+                icon:'⏳', label:'Pending Approvals',
+                value: pending.length,
+                sub: pending.length > 0 ? 'Awaiting your review' : 'All caught up!',
+                color: pending.length > 0 ? '#ef4444' : '#16a34a',
+                action: () => setTab('pending'),
               },
               {
                 icon:'🆕', label:'New This Month',
                 value: stats.new_workspaces_30d,
                 sub: 'Workspace signups',
-                color:'#ec4899',
+                color:'#0891b2',
                 action: () => { setFilterType('all'); setSortBy('newest'); setTab('workspaces'); },
+              },
+              {
+                icon:'👥', label:'Active Users',
+                value: stats.active_users_7d,
+                sub: 'Across all workspaces this week',
+                color:'#16a34a',
               },
               {
                 icon:'👻', label:'Ghost Workspaces',
                 value: stats.ghost_workspaces,
-                sub: 'Registered, no projects',
-                color: parseInt(stats.ghost_workspaces)>0 ? '#ef4444' : '#6b7280',
+                sub: 'Signed up, no projects yet',
+                color: parseInt(stats.ghost_workspaces)>0 ? '#f59e0b' : '#6b7280',
                 action: () => { setFilterType('ghost'); setTab('workspaces'); },
+              },
+              {
+                icon:'🌐', label:'Platform Total Users',
+                value: parseInt(stats.total_admins) + parseInt(stats.total_members),
+                sub: `${stats.total_admins} owners · ${stats.total_members} researchers`,
+                color:'#ec4899',
               },
             ].map((s,i) => (
               <div key={i} style={{
@@ -354,12 +383,15 @@ export default function SuperAdmin() {
           </div>
         )}
 
-        {/* Growth sparkline — monthly new workspaces */}
-        {growth.length > 0 && (
-          <div style={{ ...cardStyle, padding:'16px 20px', marginBottom:24 }}>
-            <div style={{ fontSize:12, fontWeight:600, color:'var(--text-secondary)',
-                          textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:12 }}>
-              New Workspaces — Last 12 Months
+        {/* Growth charts + export ── */}
+        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:12, marginBottom:24, alignItems:'start' }}>
+          {growth.length > 0 && (
+          <div style={{ ...cardStyle, padding:'16px 20px' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
+              <div style={{ fontSize:12, fontWeight:600, color:'var(--text-secondary)',
+                            textTransform:'uppercase', letterSpacing:'0.06em' }}>
+                New Workspaces — Last 12 Months
+              </div>
             </div>
             <div style={{ display:'flex', gap:6, alignItems:'flex-end', height:50 }}>
               {growth.map((g,i) => {
@@ -385,6 +417,94 @@ export default function SuperAdmin() {
             </div>
           </div>
         )}
+
+          {/* Export + platform report card */}
+          <div style={{ ...cardStyle, padding:'16px', minWidth:180 }}>
+            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase',
+                          letterSpacing:'0.08em', color:'var(--text-tertiary)', marginBottom:12 }}>
+              Platform Reports
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <button
+                onClick={() => {
+                  const rows = [
+                    ['Workspace', 'Admin Email', 'Members', 'Active Projects', 'Last Active', 'Created'],
+                    ...workspaces.map(w => [
+                      w.name, w.admin_email,
+                      parseInt(w.admin_count)+parseInt(w.member_count),
+                      w.active_project_count, w.last_active||'Never', w.created_at,
+                    ])
+                  ];
+                  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+                  const blob = new Blob([csv], { type:'text/csv' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `researchtrack-workspaces-${new Date().toISOString().slice(0,10)}.csv`;
+                  a.click();
+                }}
+                className="btn btn-outline btn-sm"
+                style={{ width:'100%', justifyContent:'center', fontSize:12 }}>
+                📥 Export Workspaces CSV
+              </button>
+              <button
+                onClick={() => {
+                  const rows = [
+                    ['Name', 'Email', 'Workspace', 'Institution', 'Role', 'Requested'],
+                    ...pending.map(p => [p.name, p.email, p.workspace_name, p.institution||'', p.role_in_project||'', p.created_at])
+                  ];
+                  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+                  const blob = new Blob([csv], { type:'text/csv' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `researchtrack-pending-${new Date().toISOString().slice(0,10)}.csv`;
+                  a.click();
+                }}
+                className="btn btn-outline btn-sm"
+                style={{ width:'100%', justifyContent:'center', fontSize:12 }}>
+                📥 Export Pending CSV
+              </button>
+              <button
+                onClick={() => {
+                  const rows = [
+                    ['Month', 'New Workspaces'],
+                    ...growth.map(g => [g.month, g.count])
+                  ];
+                  const csv = rows.map(r => r.join(',')).join('\n');
+                  const blob = new Blob([csv], { type:'text/csv' });
+                  const a = document.createElement('a');
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `researchtrack-growth-${new Date().toISOString().slice(0,10)}.csv`;
+                  a.click();
+                }}
+                className="btn btn-outline btn-sm"
+                style={{ width:'100%', justifyContent:'center', fontSize:12 }}>
+                📈 Export Growth CSV
+              </button>
+            </div>
+            {stats && (
+              <div style={{ marginTop:14, padding:'10px', borderRadius:8,
+                            background: dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',
+                            border:`1px solid ${border}` }}>
+                <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase',
+                              letterSpacing:'0.07em', color:'var(--text-tertiary)', marginBottom:8 }}>
+                  Platform Summary
+                </div>
+                {[
+                  ['Workspaces', stats.total_workspaces],
+                  ['Total Users', parseInt(stats.total_admins)+parseInt(stats.total_members)],
+                  ['Active Projects', stats.active_projects],
+                  ['New (30d)', stats.new_workspaces_30d],
+                ].map(([k,v]) => (
+                  <div key={k} style={{ display:'flex', justifyContent:'space-between',
+                                        fontSize:12, marginBottom:4 }}>
+                    <span style={{ color:'var(--text-tertiary)' }}>{k}</span>
+                    <span style={{ fontWeight:700, color:'var(--text-primary)' }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ── Tabs ─────────────────────────────────────────── */}
         <div style={{ display:'flex', borderBottom:`1px solid ${border}`, marginBottom:20 }}>
@@ -653,11 +773,12 @@ export default function SuperAdmin() {
                           Created {fmtDate(drillData.workspace.created_at)}
                         </div>
                       </div>
-                      <div style={{ display:'flex', gap:6' }}>
-                        <button className="btn btn-danger btn-sm"
-                          disabled={deleting===drillId}
-                          onClick={() => handleDelete(drillId, drillData.workspace.name)}>
-                          {deleting===drillId ? '…' : '🗑 Delete'}
+                      <div style={{ display:'flex', gap:6 }}>
+                        <button className="btn btn-ghost btn-sm"
+                          style={{ fontSize:11, color:'var(--text-tertiary)' }}
+                          title="Contact the workspace owner to request deletion. Workspaces cannot be deleted directly to protect user data."
+                          onClick={() => alert(`To remove the workspace "${drillData.workspace.name}", please contact the workspace owner at ${drillData.members.find(m=>m.role==='admin')?.email || 'their registered email'} and ask them to delete their own workspace from Settings. This protects against accidental data loss.`)}>
+                          ⚠️ Request Removal
                         </button>
                         <button className="btn btn-ghost btn-sm"
                           onClick={() => { setDrillId(null); setDrillData(null); }}>
@@ -766,6 +887,73 @@ export default function SuperAdmin() {
           ))}
         </div>
       </div>
+
+      {/* ── Delete-workspace confirmation modal ─────────── */}
+      {deleteConfirm && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:999,
+          background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)',
+          display:'flex', alignItems:'center', justifyContent:'center', padding:24,
+        }} onClick={() => setDeleteConfirm(null)}>
+          <div style={{
+            background: dark?'#1a1d1a':'#fff',
+            border:`1px solid rgba(239,68,68,0.35)`,
+            borderRadius:16, padding:'28px 28px 24px',
+            maxWidth:440, width:'100%', boxShadow:'0 24px 64px rgba(0,0,0,0.5)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize:28, marginBottom:10, textAlign:'center' }}>⚠️</div>
+            <div style={{ fontSize:17, fontWeight:800, color:'var(--text-primary)',
+                          textAlign:'center', marginBottom:8 }}>
+              Delete Workspace?
+            </div>
+            <div style={{ fontSize:13, color:'var(--text-secondary)', textAlign:'center',
+                          marginBottom:20, lineHeight:1.7 }}>
+              This will <strong style={{ color:'#f87171' }}>permanently remove</strong> workspace{' '}
+              <strong>"{deleteConfirm.name}"</strong> along with all its members, projects, and expenses.
+              <br /><br />
+              <span style={{ color:'var(--text-tertiary)', fontSize:12 }}>
+                This cannot be undone. If this team is actively using the workspace,
+                they will immediately lose all their data.
+              </span>
+            </div>
+            <div style={{ fontSize:12, fontWeight:700, color:'var(--text-secondary)', marginBottom:6 }}>
+              Type the workspace name to confirm:
+            </div>
+            <div style={{
+              fontSize:12, color:'#f87171', marginBottom:8,
+              padding:'6px 10px', borderRadius:6, fontFamily:'monospace',
+              background: dark?'rgba(239,68,68,0.08)':'rgba(239,68,68,0.05)',
+              border:'1px solid rgba(239,68,68,0.20)',
+            }}>
+              {deleteConfirm.name}
+            </div>
+            <input
+              autoFocus
+              value={deleteInput}
+              onChange={e => setDeleteInput(e.target.value)}
+              placeholder="Type workspace name exactly…"
+              style={{
+                width:'100%', boxSizing:'border-box',
+                padding:'9px 12px', fontSize:13, borderRadius:8, marginBottom:16,
+                border:`1px solid ${deleteInput === deleteConfirm.name ? '#ef4444' : border}`,
+                background: dark?'rgba(255,255,255,0.06)':'#f8f8f8',
+                color:'var(--text-primary)', outline:'none',
+              }}
+            />
+            <div style={{ display:'flex', gap:10 }}>
+              <button className="btn btn-ghost" style={{ flex:1 }}
+                onClick={() => { setDeleteConfirm(null); setDeleteInput(''); }}>
+                Cancel
+              </button>
+              <button className="btn btn-danger" style={{ flex:1 }}
+                disabled={deleteInput !== deleteConfirm.name || !!deleting}
+                onClick={handleDeleteConfirmed}>
+                {deleting ? '…Deleting' : '🗑 Delete Forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Profile panel ──────────────────────────────── */}
       {profileOpen && (

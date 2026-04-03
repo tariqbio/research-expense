@@ -49,7 +49,7 @@ export default function Login() {
             {[
               { icon:'🔒', title:'Completely private', desc:'Your workspace is isolated. No university, no department, no one else can access your data.' },
               { icon:'💰', title:'Full budget tracking', desc:'Fund installments, expense categories, reimbursement status — all in one place.' },
-              { icon:'📊', title:'One-click reports', desc:'Generate PDF and Excel reports for your PI, university, or funding body instantly.' },
+              { icon:'📊', title:'One-click reports', desc:'Generate PDF and Excel reports for your PI (Principal Investigator), university, or funding body instantly.' },
               { icon:'👥', title:'Team collaboration', desc:'Add researchers, assign them to projects. Each person sees only what they need.' },
             ].map((f,i) => (
               <div key={i} className="hero-feature">
@@ -189,10 +189,12 @@ export default function Login() {
           </Link>
         </div>
 
-        <div className="login-footer-text" style={{ marginTop:24, fontSize:11 }}>
+        <div className="login-footer-text" style={{ marginTop:24, fontSize:11, lineHeight:1.9 }}>
           🔒 Authorized users only. All access is logged and monitored.<br />
-          By signing in you agree to our Terms of Service and Privacy Policy.<br />
-          ResearchTrack · Built by Tariqul Islam · © 2025
+          ResearchTrack is a private research expense management platform.<br />
+          <span style={{ color:'rgba(255,255,255,0.22)' }}>
+            Built by Tariqul Islam · Faculty of Graduate Studies, DIU · © 2025
+          </span>
         </div>
       </div>
     </div>

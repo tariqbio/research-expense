@@ -11,11 +11,25 @@ const PROJECT_NATURES = [
   'Academic Research', 'Applied Research', 'Development Project',
   'Consultancy', 'Community Outreach', 'Other',
 ];
-const ROLES = [
-  'Principal Investigator (PI)', 'Co-Principal Investigator (Co-PI)',
-  'Research Fellow', 'Project Coordinator', 'Research Manager',
-  'Research Assistant', 'Other',
+// Roles are split into two groups to avoid mixing faculty and student levels.
+// PI = Principal Investigator — the senior researcher legally responsible for a funded project.
+const FACULTY_ROLES = [
+  'Principal Investigator (PI)',
+  'Co-Principal Investigator (Co-PI)',
+  'Associate Professor / Senior Lecturer',
+  'Assistant Professor / Lecturer',
+  'Research Scientist',
+  'Project Coordinator',
+  'Research Manager',
 ];
+const STUDENT_ROLES = [
+  'PhD Researcher',
+  'Masters Researcher',
+  'Research Assistant (RA)',
+  'Research Fellow',
+  'Undergraduate Researcher',
+];
+const OTHER_ROLES = ['Industry Partner', 'Consultant', 'Other'];
 
 export default function RequestAccess() {
   const [step, setStep]     = useState(1); // 1=personal, 2=workspace, 3=project
@@ -158,8 +172,19 @@ export default function RequestAccess() {
               <label className="form-label">Your Role in the Project <span className="form-required">*</span></label>
               <select className="form-select" value={form.role_in_project} onChange={set('role_in_project')} required>
                 <option value="">Select your role…</option>
-                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                <optgroup label="── Faculty / Senior Researchers ──">
+                  {FACULTY_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </optgroup>
+                <optgroup label="── Students / Junior Researchers ──">
+                  {STUDENT_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </optgroup>
+                <optgroup label="── Other ──">
+                  {OTHER_ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </optgroup>
               </select>
+              <div className="form-hint" style={{ marginTop:5 }}>
+                💡 <strong>PI (Principal Investigator)</strong> = the lead researcher responsible for a funded grant — typically a faculty member or professor who manages the project budget.
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Position / Designation</label>
