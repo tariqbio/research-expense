@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
@@ -13,130 +13,188 @@ const timeAgo = d => {
   return new Date(d).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
 };
 
-const fmtDate = d => d ? new Date(d).toLocaleDateString('en-GB',
-  { day:'2-digit', month:'short', year:'numeric' }) : '—';
-
 const activityStatus = d => {
-  if (!d) return { color:'#6b7280', label:'Never active', dot:'#6b7280' };
+  if (!d) return { color:'#6b7280', label:'Never used', bg:'rgba(107,114,128,0.12)' };
   const days = (Date.now() - new Date(d)) / 86400000;
-  if (days < 1)  return { color:'#16a34a', label:'Active today',      dot:'#16a34a' };
-  if (days < 7)  return { color:'#16a34a', label:'This week',         dot:'#16a34a' };
-  if (days < 30) return { color:'#d97706', label:'This month',        dot:'#d97706' };
-  return           { color:'#6b7280', label:'Inactive 30+ days',      dot:'#6b7280' };
+  if (days < 1)  return { color:'#16a34a', label:'Active today',      bg:'rgba(22,163,74,0.12)' };
+  if (days < 7)  return { color:'#16a34a', label:'Active this week',  bg:'rgba(22,163,74,0.10)' };
+  if (days < 30) return { color:'#d97706', label:'Active this month', bg:'rgba(217,119,6,0.12)' };
+  return           { color:'#6b7280', label:'Inactive 30+ days',      bg:'rgba(107,114,128,0.10)' };
 };
+
+const BAR_COLORS = ['#7c3aed','#2563eb','#059669','#d97706','#dc2626','#0891b2','#7c3aed','#db2777'];
+
+function MiniBarChart({ data, color = '#7c3aed' }) {
+  if (!data || data.length === 0) return <div style={{ fontSize:11, color:'var(--text-tertiary)' }}>No data yet</div>;
+  const max = Math.max(...data.map(d => parseInt(d.count)), 1);
+  return (
+    <div style={{ display:'flex', alignItems:'flex-end', gap:4, height:48 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ display:'flex', flexDirection:'column', alignItems:'center', flex:1, gap:3 }}>
+          <div style={{
+            width:'100%', borderRadius:'3px 3px 0 0',
+            background: color,
+            height: `${Math.max(4, (parseInt(d.count)/max)*44)}px`,
+            opacity: 0.7 + (i/data.length)*0.3,
+            transition: 'height 0.3s ease',
+          }} title={`${d.label||d.month}: ${d.count}`} />
+          <span style={{ fontSize:8, color:'var(--text-tertiary)', whiteSpace:'nowrap', overflow:'hidden',
+                         textOverflow:'ellipsis', maxWidth:'100%', textAlign:'center' }}>
+            {d.label||d.month}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function HorizBars({ data, total, color }) {
+  if (!data || data.length === 0) return <div style={{ fontSize:11, color:'var(--text-tertiary)' }}>No data yet</div>;
+  const max = Math.max(...data.map(d => parseInt(d.count)), 1);
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+      {data.slice(0,6).map((d, i) => (
+        <div key={i} style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ width:110, fontSize:11, color:'var(--text-secondary)', overflow:'hidden',
+                        textOverflow:'ellipsis', whiteSpace:'nowrap', flexShrink:0 }}
+               title={d.label}>{d.label}</div>
+          <div style={{ flex:1, height:8, borderRadius:4,
+                        background:'var(--bg-secondary)', overflow:'hidden' }}>
+            <div style={{
+              height:'100%', borderRadius:4,
+              background: BAR_COLORS[i % BAR_COLORS.length],
+              width:`${(parseInt(d.count)/max)*100}%`,
+              transition:'width 0.4s ease',
+            }} />
+          </div>
+          <div style={{ fontSize:11, fontWeight:600, color:'var(--text-primary)', minWidth:18, textAlign:'right' }}>
+            {d.count}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function SuperAdmin() {
   const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
-  const [theme, setTheme] = useState(() => localStorage.getItem('rt-theme') || 'light');
 
-  const [tab, setTab]       = useState('pending');
-  const [stats, setStats]   = useState(null);
+  const [theme, setTheme]     = useState(() => localStorage.getItem('rt-theme') || 'light');
+  const [tab, setTab]         = useState('pending');
+  const [stats, setStats]     = useState(null);
   const [workspaces, setWorkspaces] = useState([]);
   const [pending, setPending]       = useState([]);
-  const [growth, setGrowth]         = useState([]);
   const [loading, setLoading]       = useState(true);
-
-  // Workspace drill-down
-  const [drillId, setDrillId]     = useState(null);
-  const [drillData, setDrillData] = useState(null);
-  const [drillLoading, setDrillLoading] = useState(false);
-
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState('last_active');
-  const [filterType, setFilterType] = useState('all'); // all | active | ghost
-
-  const [approving, setApproving] = useState(null);
-  const [rejecting, setRejecting] = useState(null);
-  const [deleting, setDeleting]   = useState(null);
-  // Delete confirmation — requires typing workspace name
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name }
-  const [deleteInput, setDeleteInput]     = useState('');
+  const [search, setSearch]         = useState('');
+  const [sortBy, setSortBy]         = useState('last_active');
+  const [expanded, setExpanded]     = useState(null);
+  const [members, setMembers]       = useState({});   // wsId -> members array
+  const [membersLoading, setMembersLoading] = useState({});
+  const [approving, setApproving]   = useState(null);
+  const [rejecting, setRejecting]   = useState(null);
+  const [deleting, setDeleting]     = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
-  // Profile
-  const [pName, setPName]   = useState(user?.name || '');
-  const [avatar, setAvatar] = useState(user?.avatar_url || '');
-  const [urlIn, setUrlIn]   = useState('');
-  const [pw, setPw]         = useState({ cur:'', nw:'', cf:'' });
-  const [emailF, setEmailF] = useState({ new_email:'', password:'' });
-  const [pMsg, setPMsg]     = useState({ t:'', m:'' });
-  const [pwMsg, setPwMsg]   = useState({ t:'', m:'' });
-  const [emMsg, setEmMsg]   = useState({ t:'', m:'' });
+  const [pName, setPName]         = useState(user?.name || '');
+  const [avatarPreview, setAP]    = useState(user?.avatar_url || '');
+  const [urlInput, setUrlInput]   = useState('');
+  const [pw, setPw]               = useState({ current:'', newpw:'', confirm:'' });
+  const [emailF, setEmailF]       = useState({ new_email:'', password:'' });
+  const [pMsg, setPMsg]           = useState({ type:'', text:'' });
+  const [pwMsg, setPwMsg]         = useState({ type:'', text:'' });
+  const [emailMsg, setEmailMsg]   = useState({ type:'', text:'' });
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('rt-theme', theme);
   }, [theme]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [s, w, p, g] = await Promise.all([
+      const [s, w, p] = await Promise.all([
         api.get('/super/stats'),
         api.get('/super/workspaces'),
         api.get('/auth/pending-signups'),
-        api.get('/super/growth'),
       ]);
       setStats(s.data);
       setWorkspaces(w.data);
       setPending(p.data);
-      setGrowth(g.data);
-      setTab(p.data.length > 0 ? 'pending' : 'workspaces');
+      if (p.data.length > 0) setTab('pending');
+      else setTab('workspaces');
     } catch(e) { console.error(e); }
     finally { setLoading(false); }
-  };
-  useEffect(() => { load(); }, []);
+  }, []);
 
-  const loadDrill = async id => {
-    if (drillId === id) { setDrillId(null); setDrillData(null); return; }
-    setDrillId(id); setDrillLoading(true);
+  useEffect(() => { load(); }, [load]);
+
+  const loadMembers = async (wsId) => {
+    if (members[wsId]) return; // cached
+    setMembersLoading(m => ({ ...m, [wsId]: true }));
     try {
-      const { data } = await api.get(`/super/workspaces/${id}`);
-      setDrillData(data);
+      const { data } = await api.get(`/super/workspaces/${wsId}/members`);
+      setMembers(m => ({ ...m, [wsId]: data }));
     } catch(e) { console.error(e); }
-    finally { setDrillLoading(false); }
+    finally { setMembersLoading(m => ({ ...m, [wsId]: false })); }
+  };
+
+  const handleExpand = (wsId) => {
+    const opening = expanded !== wsId;
+    setExpanded(opening ? wsId : null);
+    if (opening) loadMembers(wsId);
   };
 
   const handleApprove = async (id, name) => {
     setApproving(id);
-    try { await api.post(`/auth/pending-signups/${id}/approve`); await load(); }
-    catch(e) { alert(e.response?.data?.error || 'Failed'); }
+    try {
+      await api.post(`/auth/pending-signups/${id}/approve`);
+      setPending(p => p.filter(x => x.id !== id));
+      if (pending.length === 1) setTab('workspaces');
+      await load();
+    } catch(e) { alert(e.response?.data?.error || 'Approval failed'); }
     finally { setApproving(null); }
   };
 
   const handleReject = async (id, name) => {
-    if (!confirm(`Reject request from ${name}?`)) return;
+    if (!confirm(`Reject and delete access request from ${name}?`)) return;
     setRejecting(id);
-    try { await api.delete(`/auth/pending-signups/${id}`); setPending(p=>p.filter(x=>x.id!==id)); }
-    catch(e) { alert('Failed'); }
+    try {
+      await api.delete(`/auth/pending-signups/${id}`);
+      setPending(p => p.filter(x => x.id !== id));
+    } catch(e) { alert('Failed to reject'); }
     finally { setRejecting(null); }
   };
 
-  const handleDeleteConfirmed = async () => {
-    if (!deleteConfirm) return;
-    const { id, name } = deleteConfirm;
+  const handleDeleteWorkspace = async (id, name) => {
+    if (!confirm(`Permanently delete workspace "${name}"?\n\nThis removes ALL users, projects, and expenses. Cannot be undone.`)) return;
     setDeleting(id);
     try {
       await api.delete(`/super/workspaces/${id}`);
-      setWorkspaces(ws=>ws.filter(w=>w.id!==id));
-      if (drillId===id) { setDrillId(null); setDrillData(null); }
-      setDeleteConfirm(null); setDeleteInput('');
-    } catch(e) { alert('Failed to delete workspace.'); }
+      setWorkspaces(ws => ws.filter(w => w.id !== id));
+      setExpanded(null);
+    } catch(e) { alert(e.response?.data?.error || 'Delete failed'); }
     finally { setDeleting(null); }
   };
 
-  const compressAvatar = file => {
+  const handleAvatarFile = e => {
+    const file = e.target.files[0];
     if (!file || !file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = ev => {
       const img = new Image();
       img.onload = () => {
-        const MAX=300; let w=img.width, h=img.height;
-        if (w>MAX||h>MAX) { if(w>h){h=Math.round(h*MAX/w);w=MAX;}else{w=Math.round(w*MAX/h);h=MAX;} }
-        const c=document.createElement('canvas'); c.width=w; c.height=h;
-        c.getContext('2d').drawImage(img,0,0,w,h);
-        setAvatar(c.toDataURL('image/jpeg',0.82));
+        const MAX = 300;
+        let w = img.width, h = img.height;
+        if (w > MAX || h > MAX) {
+          if (w > h) { h = Math.round(h*MAX/w); w = MAX; }
+          else       { w = Math.round(w*MAX/h); h = MAX; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        setAP(canvas.toDataURL('image/jpeg', 0.82));
       };
       img.src = ev.target.result;
     };
@@ -144,83 +202,97 @@ export default function SuperAdmin() {
   };
 
   const saveProfile = async () => {
-    setPMsg({ t:'', m:'' });
+    setPMsg({ type:'', text:'' });
     try {
-      const { data } = await api.patch('/auth/profile', { name:pName, avatar_url:avatar||null });
-      updateUser({ name:data.name, avatar_url:data.avatar_url });
-      setPMsg({ t:'ok', m:'Saved' });
-    } catch(e) { setPMsg({ t:'err', m:e.response?.data?.error||'Failed' }); }
+      const { data } = await api.patch('/auth/profile', { name: pName, avatar_url: avatarPreview || null });
+      updateUser({ name: data.name, avatar_url: data.avatar_url });
+      setPMsg({ type:'ok', text:'Saved successfully' });
+    } catch(e) { setPMsg({ type:'err', text: e.response?.data?.error || 'Failed' }); }
   };
 
   const changePassword = async () => {
-    if (pw.nw!==pw.cf) return setPwMsg({ t:'err', m:'Passwords do not match' });
+    if (pw.newpw !== pw.confirm) return setPwMsg({ type:'err', text:'Passwords do not match' });
+    setPwMsg({ type:'', text:'' });
     try {
-      await api.patch('/auth/change-password', { current_password:pw.cur, new_password:pw.nw });
-      setPwMsg({ t:'ok', m:'Password changed' });
-      setPw({ cur:'', nw:'', cf:'' });
-    } catch(e) { setPwMsg({ t:'err', m:e.response?.data?.error||'Failed' }); }
+      await api.patch('/auth/change-password', { current_password:pw.current, new_password:pw.newpw });
+      setPwMsg({ type:'ok', text:'Password changed' });
+      setPw({ current:'', newpw:'', confirm:'' });
+    } catch(e) { setPwMsg({ type:'err', text: e.response?.data?.error || 'Failed' }); }
   };
 
   const changeEmail = async () => {
+    setEmailMsg({ type:'', text:'' });
     try {
       await api.patch('/auth/change-email', emailF);
-      setEmMsg({ t:'ok', m:'Email updated — signing out…' });
+      setEmailMsg({ type:'ok', text:'Email updated — signing out…' });
       setTimeout(() => { logout(); navigate('/login'); }, 1500);
-    } catch(e) { setEmMsg({ t:'err', m:e.response?.data?.error||'Failed' }); }
+    } catch(e) { setEmailMsg({ type:'err', text: e.response?.data?.error || 'Failed' }); }
   };
 
-  // Filter + sort workspaces
   const filtered = workspaces
-    .filter(w => {
-      if (filterType==='active') return parseInt(w.active_project_count)>0;
-      if (filterType==='ghost')  return parseInt(w.total_project_count)===0;
-      return true;
-    })
     .filter(w => !search ||
       w.name.toLowerCase().includes(search.toLowerCase()) ||
-      (w.admin_email||'').toLowerCase().includes(search.toLowerCase()) ||
-      (w.admin_name||'').toLowerCase().includes(search.toLowerCase()) ||
-      (w.admin_institution||'').toLowerCase().includes(search.toLowerCase()))
+      (w.report_header||'').toLowerCase().includes(search.toLowerCase()) ||
+      (w.institution||'').toLowerCase().includes(search.toLowerCase()))
     .sort((a,b) => {
       if (sortBy==='last_active') return new Date(b.last_active||0)-new Date(a.last_active||0);
       if (sortBy==='newest')      return new Date(b.created_at)-new Date(a.created_at);
       if (sortBy==='name')        return a.name.localeCompare(b.name);
       if (sortBy==='users')       return (parseInt(b.admin_count)+parseInt(b.member_count))-(parseInt(a.admin_count)+parseInt(a.member_count));
-      if (sortBy==='projects')    return parseInt(b.active_project_count)-parseInt(a.active_project_count);
+      if (sortBy==='projects')    return parseInt(b.project_count)-parseInt(a.project_count);
       return 0;
     });
 
-  const initials = user?.name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)||'SA';
+  const initials = user?.name?.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) || 'SA';
 
-  const dark = theme==='dark';
-  const border = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.09)';
-  const surfBg = dark ? 'rgba(28,30,26,0.95)' : '#fff';
-  const hoverBg = dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)';
+  const S = {
+    topbar: {
+      position:'sticky', top:0, zIndex:100,
+      background: theme==='dark' ? 'rgba(20,22,20,0.88)' : 'rgba(255,255,255,0.82)',
+      backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
+      borderBottom:`1px solid ${theme==='dark'?'rgba(255,255,255,0.10)':'rgba(0,0,0,0.09)'}`,
+      padding:'0 24px', height:56,
+      display:'flex', alignItems:'center', justifyContent:'space-between',
+    },
+    page: { flex:1, padding:'24px', maxWidth:1100, margin:'0 auto', width:'100%' },
+    card: {
+      background: theme==='dark' ? 'rgba(28,30,26,0.78)' : 'rgba(255,255,255,0.85)',
+      border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.09)'}`,
+      borderRadius:14,
+      backdropFilter:'blur(24px)', WebkitBackdropFilter:'blur(24px)',
+      boxShadow: theme==='dark'
+        ? '0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.4)'
+        : '0 0 0 1px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.06)',
+      overflow:'hidden',
+    },
+    input: {
+      width:'100%', padding:'8px 12px', fontSize:13,
+      border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.16)':'rgba(0,0,0,0.15)'}`,
+      borderRadius:8, outline:'none', marginBottom:8,
+      background: theme==='dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.03)',
+      color:'var(--text-primary)',
+    },
+    label: {
+      display:'block', fontSize:11, fontWeight:600, letterSpacing:'0.06em',
+      textTransform:'uppercase', color:'var(--text-tertiary)', marginBottom:6,
+    },
+    tabBtn: (active) => ({
+      background:'none', border:'none',
+      borderBottom: active ? '2px solid var(--accent)' : '2px solid transparent',
+      color: active ? 'var(--accent)' : 'var(--text-secondary)',
+      padding:'10px 16px', fontSize:13, fontWeight: active ? 600 : 500, cursor:'pointer',
+    }),
+    sectionTitle: {
+      fontSize:12, fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em',
+      color:'var(--text-tertiary)', marginBottom:12,
+    },
+  };
 
-  const Msg = ({ m }) => m.m ? (
-    <div style={{ fontSize:12, marginTop:5, color:m.t==='ok'?'#16a34a':'#dc2626' }}>
-      {m.t==='ok'?'✓ ':'✗ '}{m.m}
+  const Msg = ({ m }) => m.text ? (
+    <div style={{ fontSize:12, marginTop:6, color: m.type==='ok' ? '#16a34a' : '#dc2626' }}>
+      {m.type==='ok' ? '✓ ' : '✗ '}{m.text}
     </div>
   ) : null;
-
-  const Input = ({ ...props }) => (
-    <input {...props} style={{
-      width:'100%', padding:'8px 12px', fontSize:13, marginBottom:8, borderRadius:8,
-      border:`1px solid ${border}`, outline:'none',
-      background: dark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.03)',
-      color:'var(--text-primary)', ...props.style,
-    }} />
-  );
-
-  const cardStyle = {
-    background: dark?'rgba(28,30,26,0.90)':'rgba(255,255,255,0.85)',
-    border:`1px solid ${border}`, borderRadius:14,
-    backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
-    boxShadow: dark
-      ? '0 0 0 1px rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.4)'
-      : '0 0 0 1px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.07)',
-    overflow:'hidden',
-  };
 
   if (loading) return (
     <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center',
@@ -230,40 +302,84 @@ export default function SuperAdmin() {
     </div>
   );
 
+  // ── Platform summary numbers for quick-glance stat cards ──
+  const statCards = stats ? [
+    {
+      label:'Workspaces (PIs)',
+      value: stats.total_workspaces,
+      sub: `${stats.new_workspaces_7d} new this week`,
+      icon:'🏛️', color:'#7c3aed',
+    },
+    {
+      label:'Total Researchers',
+      value: stats.total_members,
+      sub: `${stats.active_users_7d} active this week`,
+      icon:'🔬', color:'#2563eb',
+    },
+    {
+      label:'Active Projects',
+      value: stats.active_projects,
+      sub: `${stats.completed_projects} completed`,
+      icon:'📁', color:'#059669',
+    },
+    {
+      label:'Pending Approvals',
+      value: pending.length,
+      icon: pending.length > 0 ? '⏳' : '✅',
+      color: pending.length > 0 ? '#ef4444' : '#16a34a',
+      sub: pending.length > 0 ? 'Need your review' : 'All clear',
+      action: pending.length > 0 ? () => setTab('pending') : null,
+    },
+    {
+      label:'Online Today',
+      value: stats.active_users_24h,
+      sub: `Avg team: ${stats.avg_team_size} members`,
+      icon:'🟢', color:'#059669',
+    },
+    {
+      label:'Total Expenses Filed',
+      value: stats.total_expenses,
+      sub: `Across ${stats.total_projects} projects`,
+      icon:'📋', color:'#d97706',
+    },
+  ] : [];
+
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg-base)', display:'flex', flexDirection:'column' }}>
 
-      {/* ── Topbar ──────────────────────────────────────── */}
-      <header style={{
-        position:'sticky', top:0, zIndex:100,
-        background: dark?'rgba(20,22,20,0.90)':'rgba(255,255,255,0.88)',
-        backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)',
-        borderBottom:`1px solid ${border}`,
-        padding:'0 24px', height:56,
-        display:'flex', alignItems:'center', justifyContent:'space-between',
-        boxShadow: dark?'0 1px 12px rgba(0,0,0,0.3)':'0 1px 6px rgba(0,0,0,0.06)',
-      }}>
+      {/* ── Topbar ─────────────────────────────────────── */}
+      <header style={S.topbar}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <div style={{ width:30, height:30, borderRadius:8,
                         background:'linear-gradient(135deg,#7c3aed,#4f46e5)',
                         display:'flex', alignItems:'center', justifyContent:'center',
                         fontSize:14, fontWeight:800, color:'#fff' }}>R</div>
           <span style={{ fontWeight:700, fontSize:14, color:'var(--text-primary)' }}>ResearchTrack</span>
-          <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, fontWeight:600,
+          <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20,
                          background:'rgba(124,58,237,0.12)', color:'#7c3aed',
-                         border:'1px solid rgba(124,58,237,0.25)' }}>Super Admin</span>
+                         border:'1px solid rgba(124,58,237,0.25)', fontWeight:600 }}>
+            Super Admin
+          </span>
         </div>
+
         <div style={{ display:'flex', alignItems:'center', gap:8 }}>
           {pending.length > 0 && (
             <button onClick={() => setTab('pending')} style={{
               background:'#ef4444', color:'#fff', border:'none', borderRadius:20,
               padding:'3px 10px', fontSize:11, fontWeight:700, cursor:'pointer',
-            }}>{pending.length} pending</button>
+            }}>
+              {pending.length} pending
+            </button>
           )}
-          <button onClick={() => setTheme(t=>t==='light'?'dark':'light')} style={{
-            width:32, height:32, borderRadius:8, cursor:'pointer', fontSize:15,
-            background:dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.05)',
-            border:`1px solid ${border}`,
+          <button onClick={() => setAnalyticsOpen(true)} style={{
+            padding:'5px 12px', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:600,
+            background: theme==='dark'?'rgba(124,58,237,0.15)':'rgba(124,58,237,0.08)',
+            border:'1px solid rgba(124,58,237,0.25)', color:'#7c3aed',
+          }}>📊 Analytics</button>
+          <button onClick={() => setTheme(t => t==='light'?'dark':'light')} style={{
+            width:32, height:32, borderRadius:8, cursor:'pointer', fontSize:14,
+            background: theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.05)',
+            border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.10)'}`,
             display:'flex', alignItems:'center', justifyContent:'center',
           }}>{theme==='light'?'🌙':'☀️'}</button>
           <button onClick={() => setProfileOpen(true)} style={{
@@ -271,615 +387,436 @@ export default function SuperAdmin() {
             border:'2px solid rgba(124,58,237,0.4)', overflow:'hidden',
             background:'#7c3aed', flexShrink:0,
           }}>
-            {(avatar||user?.avatar_url)
-              ? <img src={avatar||user?.avatar_url} alt=""
+            {(avatarPreview||user?.avatar_url)
+              ? <img src={avatarPreview||user?.avatar_url} alt=""
                   style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-              : <span style={{ fontSize:11, fontWeight:700, color:'#fff' }}>{initials}</span>}
+              : <span style={{ fontSize:11, fontWeight:700, color:'#fff', lineHeight:'32px' }}>{initials}</span>}
           </button>
           <button className="btn btn-outline btn-sm"
             onClick={() => { logout(); navigate('/login'); }}>Sign Out</button>
         </div>
       </header>
 
-      {/* ── Content ─────────────────────────────────────── */}
-      <div style={{ flex:1, padding:'24px', maxWidth:1080, margin:'0 auto', width:'100%' }}>
+      <div style={S.page}>
 
-        {/* Page header */}
-        <div style={{ marginBottom:20, display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:12, flexWrap:'wrap' }}>
-          <div>
-            <h1 style={{ margin:0, fontSize:22, fontWeight:700, color:'var(--text-primary)' }}>
-              Platform Control
-            </h1>
-            <p style={{ margin:'4px 0 0', fontSize:13, color:'var(--text-tertiary)' }}>
-              {user?.email} · Financial data inside workspaces is private and not visible to you
-            </p>
-          </div>
-          <button
-            className="btn btn-outline btn-sm"
-            style={{ fontSize:12, display:'flex', alignItems:'center', gap:6, flexShrink:0 }}
-            onClick={() => {
-              if (!workspaces.length) return alert('No workspace data loaded yet.');
-              const rows = [
-                ['Workspace Name','Report Header','Owner','Owner Email','Institution','Members','Active Projects','Total Projects','Last Active','Created'],
-                ...workspaces.map(w => [
-                  w.name, w.report_header||'', w.admin_name||'', w.admin_email||'',
-                  w.admin_institution||'', parseInt(w.admin_count)+parseInt(w.member_count),
-                  w.active_project_count, w.total_project_count,
-                  w.last_active ? new Date(w.last_active).toLocaleDateString('en-GB') : 'Never',
-                  new Date(w.created_at).toLocaleDateString('en-GB'),
-                ])
-              ];
-              const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
-              const blob = new Blob([csv], { type:'text/csv' });
-              const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-              a.download = `platform-summary-${new Date().toISOString().slice(0,10)}.csv`;
-              a.click();
-            }}>
-            📥 Export Workspace List (CSV)
-          </button>
-        </div>
-
-        {/* ── Stats (platform-health metrics relevant to SuperAdmin) ── */}
+        {/* ── Stat Cards Row ─────────────────────────── */}
         {stats && (
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',
-                        gap:12, marginBottom:24 }}>
-            {[
-              {
-                icon:'🏠', label:'Total Workspaces',
-                value: stats.total_workspaces,
-                sub: `${stats.workspaces_with_projects} have active projects`,
-                color:'#7c3aed',
-                action: () => { setFilterType('all'); setTab('workspaces'); },
-              },
-              {
-                icon:'⏳', label:'Pending Approvals',
-                value: pending.length,
-                sub: pending.length > 0 ? 'Awaiting your review' : 'All caught up!',
-                color: pending.length > 0 ? '#ef4444' : '#16a34a',
-                action: () => setTab('pending'),
-              },
-              {
-                icon:'🆕', label:'New This Month',
-                value: stats.new_workspaces_30d,
-                sub: 'Workspace signups',
-                color:'#0891b2',
-                action: () => { setFilterType('all'); setSortBy('newest'); setTab('workspaces'); },
-              },
-              {
-                icon:'👥', label:'Active Users',
-                value: stats.active_users_7d,
-                sub: 'Across all workspaces this week',
-                color:'#16a34a',
-              },
-              {
-                icon:'👻', label:'Ghost Workspaces',
-                value: stats.ghost_workspaces,
-                sub: 'Signed up, no projects yet',
-                color: parseInt(stats.ghost_workspaces)>0 ? '#f59e0b' : '#6b7280',
-                action: () => { setFilterType('ghost'); setTab('workspaces'); },
-              },
-              {
-                icon:'🌐', label:'Platform Total Users',
-                value: parseInt(stats.total_admins) + parseInt(stats.total_members),
-                sub: `${stats.total_admins} owners · ${stats.total_members} researchers`,
-                color:'#ec4899',
-              },
-            ].map((s,i) => (
-              <div key={i} style={{
-                ...cardStyle, padding:'14px 16px',
-                cursor: s.action ? 'pointer' : 'default',
-                transition:'transform 0.15s, box-shadow 0.15s',
-              }}
+                        gap:12, marginBottom:20 }}>
+            {statCards.map((s,i) => (
+              <div key={i}
                 onClick={s.action}
+                style={{
+                  ...S.card, padding:'16px',
+                  cursor: s.action ? 'pointer' : 'default',
+                  transition:'transform 0.15s',
+                }}
                 onMouseEnter={e => s.action && (e.currentTarget.style.transform='translateY(-2px)')}
-                onMouseLeave={e => s.action && (e.currentTarget.style.transform='none')}>
-                <div style={{ fontSize:18, marginBottom:6 }}>{s.icon}</div>
+                onMouseLeave={e => s.action && (e.currentTarget.style.transform='none')}
+              >
+                <div style={{ fontSize:20, marginBottom:6 }}>{s.icon}</div>
                 <div style={{ fontSize:26, fontWeight:800, color:s.color, lineHeight:1 }}>{s.value}</div>
                 <div style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)', marginTop:4 }}>{s.label}</div>
                 <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:2 }}>{s.sub}</div>
-                {s.note && <div style={{ fontSize:10, color:'#ef4444', marginTop:3, fontWeight:600 }}>{s.note}</div>}
               </div>
             ))}
           </div>
         )}
 
-        {/* Growth charts + export ── */}
-        <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:12, marginBottom:24, alignItems:'start' }}>
-          {growth.length > 0 && (
-          <div style={{ ...cardStyle, padding:'16px 20px' }}>
-            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-              <div style={{ fontSize:12, fontWeight:600, color:'var(--text-secondary)',
-                            textTransform:'uppercase', letterSpacing:'0.06em' }}>
-                New Workspaces — Last 12 Months
+        {/* ── Platform Growth + Quick Analytics ──────── */}
+        {stats && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12, marginBottom:20 }}>
+            {/* Monthly growth */}
+            <div style={{ ...S.card, padding:'18px' }}>
+              <div style={S.sectionTitle}>📈 New Workspaces / Month</div>
+              <MiniBarChart data={stats.monthly_growth} color="#7c3aed" />
+              <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:8 }}>
+                {stats.new_workspaces_30d} new in last 30 days
               </div>
             </div>
-            <div style={{ display:'flex', gap:6, alignItems:'flex-end', height:50 }}>
-              {growth.map((g,i) => {
-                const max = Math.max(...growth.map(x=>parseInt(x.count)), 1);
-                const h = Math.max(4, (parseInt(g.count)/max)*46);
-                return (
-                  <div key={i} style={{ flex:1, display:'flex', flexDirection:'column',
-                                        alignItems:'center', gap:3 }}>
-                    <div style={{ fontSize:9, color:'var(--text-tertiary)', fontWeight:600 }}>
-                      {g.count}
-                    </div>
-                    <div style={{
-                      width:'100%', height:`${h}px`, borderRadius:3,
-                      background: i===growth.length-1 ? '#7c3aed' : (dark?'rgba(124,58,237,0.35)':'rgba(124,58,237,0.20)'),
-                      transition:'height 0.3s',
-                    }} />
-                    <div style={{ fontSize:9, color:'var(--text-tertiary)', whiteSpace:'nowrap' }}>
-                      {g.month}
-                    </div>
-                  </div>
-                );
-              })}
+
+            {/* Top institutions */}
+            <div style={{ ...S.card, padding:'18px' }}>
+              <div style={S.sectionTitle}>🏛️ Top Institutions</div>
+              {stats.top_institutions.length > 0
+                ? <HorizBars data={stats.top_institutions} />
+                : <div style={{ fontSize:12, color:'var(--text-tertiary)', paddingTop:8 }}>
+                    Fills in as users register with institution data
+                  </div>}
+            </div>
+
+            {/* Top granting agencies */}
+            <div style={{ ...S.card, padding:'18px' }}>
+              <div style={S.sectionTitle}>💰 Top Granting Agencies</div>
+              {stats.top_agencies.length > 0
+                ? <HorizBars data={stats.top_agencies} />
+                : <div style={{ fontSize:12, color:'var(--text-tertiary)', paddingTop:8 }}>
+                    Fills in as PIs register with funding source data
+                  </div>}
             </div>
           </div>
         )}
 
-          {/* Export + platform report card */}
-          <div style={{ ...cardStyle, padding:'16px', minWidth:180 }}>
-            <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase',
-                          letterSpacing:'0.08em', color:'var(--text-tertiary)', marginBottom:12 }}>
-              Platform Reports
+        {/* ── Second analytics row ─────────────────── */}
+        {stats && (
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
+            {/* Degree breakdown */}
+            <div style={{ ...S.card, padding:'18px' }}>
+              <div style={S.sectionTitle}>🎓 PI Academic Qualifications</div>
+              {stats.degree_breakdown.length > 0
+                ? <HorizBars data={stats.degree_breakdown} />
+                : <div style={{ fontSize:12, color:'var(--text-tertiary)', paddingTop:4 }}>
+                    Populates after PIs complete the qualification field at registration
+                  </div>}
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <button
-                onClick={() => {
-                  const rows = [
-                    ['Workspace', 'Admin Email', 'Members', 'Active Projects', 'Last Active', 'Created'],
-                    ...workspaces.map(w => [
-                      w.name, w.admin_email,
-                      parseInt(w.admin_count)+parseInt(w.member_count),
-                      w.active_project_count, w.last_active||'Never', w.created_at,
-                    ])
-                  ];
-                  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-                  const blob = new Blob([csv], { type:'text/csv' });
-                  const a = document.createElement('a');
-                  a.href = URL.createObjectURL(blob);
-                  a.download = `researchtrack-workspaces-${new Date().toISOString().slice(0,10)}.csv`;
-                  a.click();
-                }}
-                className="btn btn-outline btn-sm"
-                style={{ width:'100%', justifyContent:'center', fontSize:12 }}>
-                📥 Export Workspaces CSV
-              </button>
-              <button
-                onClick={() => {
-                  const rows = [
-                    ['Name', 'Email', 'Workspace', 'Institution', 'Role', 'Requested'],
-                    ...pending.map(p => [p.name, p.email, p.workspace_name, p.institution||'', p.role_in_project||'', p.created_at])
-                  ];
-                  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-                  const blob = new Blob([csv], { type:'text/csv' });
-                  const a = document.createElement('a');
-                  a.href = URL.createObjectURL(blob);
-                  a.download = `researchtrack-pending-${new Date().toISOString().slice(0,10)}.csv`;
-                  a.click();
-                }}
-                className="btn btn-outline btn-sm"
-                style={{ width:'100%', justifyContent:'center', fontSize:12 }}>
-                📥 Export Pending CSV
-              </button>
-              <button
-                onClick={() => {
-                  const rows = [
-                    ['Month', 'New Workspaces'],
-                    ...growth.map(g => [g.month, g.count])
-                  ];
-                  const csv = rows.map(r => r.join(',')).join('\n');
-                  const blob = new Blob([csv], { type:'text/csv' });
-                  const a = document.createElement('a');
-                  a.href = URL.createObjectURL(blob);
-                  a.download = `researchtrack-growth-${new Date().toISOString().slice(0,10)}.csv`;
-                  a.click();
-                }}
-                className="btn btn-outline btn-sm"
-                style={{ width:'100%', justifyContent:'center', fontSize:12 }}>
-                📈 Export Growth CSV
-              </button>
+
+            {/* Research areas */}
+            <div style={{ ...S.card, padding:'18px' }}>
+              <div style={S.sectionTitle}>🔬 Research Areas</div>
+              {stats.top_research_areas.length > 0
+                ? <HorizBars data={stats.top_research_areas} />
+                : <div style={{ fontSize:12, color:'var(--text-tertiary)', paddingTop:4 }}>
+                    Shows top research domains once PIs register with area data
+                  </div>}
             </div>
-            {stats && (
-              <div style={{ marginTop:14, padding:'10px', borderRadius:8,
-                            background: dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',
-                            border:`1px solid ${border}` }}>
-                <div style={{ fontSize:10, fontWeight:700, textTransform:'uppercase',
-                              letterSpacing:'0.07em', color:'var(--text-tertiary)', marginBottom:8 }}>
-                  Platform Summary
+          </div>
+        )}
+
+        {/* ── Tabs ─────────────────────────────────── */}
+        <div style={{ display:'flex', borderBottom:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'}`,
+                      marginBottom:20 }}>
+          <button style={S.tabBtn(tab==='pending')} onClick={() => setTab('pending')}>
+            Pending Requests
+            {pending.length > 0 && (
+              <span style={{ marginLeft:6, background:'#ef4444', color:'#fff',
+                             borderRadius:10, padding:'1px 6px', fontSize:10, fontWeight:700 }}>
+                {pending.length}
+              </span>
+            )}
+          </button>
+          <button style={S.tabBtn(tab==='workspaces')} onClick={() => setTab('workspaces')}>
+            Workspaces ({workspaces.length})
+          </button>
+        </div>
+
+        {/* ── PENDING TAB ─────────────────────────── */}
+        {tab==='pending' && (
+          <>
+            {pending.length === 0 ? (
+              <div style={{ ...S.card, padding:48, textAlign:'center' }}>
+                <div style={{ fontSize:40, marginBottom:12 }}>✅</div>
+                <div style={{ fontSize:16, fontWeight:600, color:'var(--text-primary)', marginBottom:6 }}>
+                  No pending requests
                 </div>
-                {[
-                  ['Workspaces', stats.total_workspaces],
-                  ['Total Users', parseInt(stats.total_admins)+parseInt(stats.total_members)],
-                  ['Active Projects', stats.active_projects],
-                  ['New (30d)', stats.new_workspaces_30d],
-                ].map(([k,v]) => (
-                  <div key={k} style={{ display:'flex', justifyContent:'space-between',
-                                        fontSize:12, marginBottom:4 }}>
-                    <span style={{ color:'var(--text-tertiary)' }}>{k}</span>
-                    <span style={{ fontWeight:700, color:'var(--text-primary)' }}>{v}</span>
+                <div style={{ fontSize:13, color:'var(--text-tertiary)' }}>
+                  When someone requests access, it will appear here.
+                </div>
+              </div>
+            ) : (
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                {pending.map(p => (
+                  <div key={p.id} style={{ ...S.card, padding:'20px' }}>
+                    <div style={{ display:'flex', gap:16, alignItems:'flex-start', flexWrap:'wrap' }}>
+                      {/* Avatar */}
+                      <div style={{
+                        width:52, height:52, borderRadius:'50%',
+                        background:'linear-gradient(135deg,#d97706,#f59e0b)',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:18, fontWeight:700, color:'#fff', flexShrink:0,
+                      }}>
+                        {p.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
+                      </div>
+
+                      {/* Info */}
+                      <div style={{ flex:1, minWidth:200 }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:4 }}>
+                          <span style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>
+                            {p.name}
+                          </span>
+                          {p.academic_degree && (
+                            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20,
+                                           background:'rgba(124,58,237,0.10)', color:'#7c3aed',
+                                           border:'1px solid rgba(124,58,237,0.20)' }}>
+                              {p.academic_degree}
+                            </span>
+                          )}
+                          {p.position && (
+                            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20,
+                                           background:'rgba(0,0,0,0.06)', color:'var(--text-secondary)',
+                                           border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.10)':'rgba(0,0,0,0.08)'}` }}>
+                              {p.position}
+                            </span>
+                          )}
+                          {p.publication_count > 0 && (
+                            <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20,
+                                           background:'rgba(5,150,105,0.10)', color:'#059669',
+                                           border:'1px solid rgba(5,150,105,0.20)' }}>
+                              {p.publication_count} publications
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:6 }}>{p.email}</div>
+
+                        {/* Institution + Department */}
+                        {(p.institution || p.department) && (
+                          <div style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:4 }}>
+                            🏛️ {[p.department, p.institution].filter(Boolean).join(', ')}
+                          </div>
+                        )}
+
+                        {/* Research area */}
+                        {p.research_area && (
+                          <div style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:4 }}>
+                            🔬 Research: <strong>{p.research_area}</strong>
+                          </div>
+                        )}
+
+                        {/* Workspace + granting agency */}
+                        <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap', marginBottom:4 }}>
+                          <span style={{ fontSize:12, color:'var(--text-tertiary)' }}>Workspace:</span>
+                          <span style={{ fontSize:12, fontWeight:600, color:'var(--text-primary)' }}>
+                            {p.workspace_name}
+                          </span>
+                        </div>
+
+                        {p.granting_agency && (
+                          <div style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:4 }}>
+                            💰 Funded by: <strong>{p.granting_agency}</strong>
+                            {p.expected_fund_amt && (
+                              <span style={{ color:'var(--text-tertiary)' }}> · Est. {p.expected_fund_amt}</span>
+                            )}
+                          </div>
+                        )}
+
+                        {p.orcid_id && (
+                          <div style={{ fontSize:12, color:'var(--text-tertiary)', marginBottom:4 }}>
+                            🪪 ORCID: {p.orcid_id}
+                          </div>
+                        )}
+
+                        {p.message && (
+                          <div style={{
+                            marginTop:10, padding:'10px 14px',
+                            background: theme==='dark'?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',
+                            borderRadius:8, borderLeft:'3px solid #d97706',
+                            fontSize:13, color:'var(--text-secondary)', fontStyle:'italic',
+                          }}>
+                            "{p.message}"
+                          </div>
+                        )}
+                        <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:8 }}>
+                          Requested {timeAgo(p.created_at)}
+                        </div>
+                      </div>
+
+                      {/* Actions */}
+                      <div style={{ display:'flex', flexDirection:'column', gap:8, flexShrink:0 }}>
+                        <button className="btn btn-success btn-sm"
+                          disabled={approving===p.id} style={{ minWidth:110 }}
+                          onClick={() => handleApprove(p.id, p.name)}>
+                          {approving===p.id ? '…Approving' : '✓ Approve'}
+                        </button>
+                        <button className="btn btn-outline btn-sm"
+                          disabled={rejecting===p.id}
+                          style={{ minWidth:110, color:'var(--danger)', borderColor:'var(--danger)' }}
+                          onClick={() => handleReject(p.id, p.name)}>
+                          {rejecting===p.id ? '…' : '✕ Reject'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
-          </div>
-        </div>
-
-        {/* ── Tabs ─────────────────────────────────────────── */}
-        <div style={{ display:'flex', borderBottom:`1px solid ${border}`, marginBottom:20 }}>
-          {[
-            { key:'pending',    label:'Pending Requests', badge: pending.length },
-            { key:'workspaces', label:`Workspaces (${workspaces.length})` },
-          ].map(t => (
-            <button key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding:'10px 16px', fontSize:13, fontWeight: tab===t.key ? 600 : 500,
-                cursor:'pointer', background:'none', border:'none',
-                borderBottom: tab===t.key ? '2px solid var(--accent)' : '2px solid transparent',
-                color: tab===t.key ? 'var(--accent)' : 'var(--text-secondary)',
-                display:'flex', alignItems:'center', gap:6,
-              }}>
-              {t.label}
-              {t.badge > 0 && (
-                <span style={{ background:'#ef4444', color:'#fff', borderRadius:10,
-                               padding:'1px 6px', fontSize:10, fontWeight:700 }}>
-                  {t.badge}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* ── PENDING TAB ──────────────────────────────────── */}
-        {tab==='pending' && (
-          pending.length === 0 ? (
-            <div style={{ ...cardStyle, padding:48, textAlign:'center' }}>
-              <div style={{ fontSize:36, marginBottom:12 }}>✅</div>
-              <div style={{ fontSize:15, fontWeight:600, color:'var(--text-primary)', marginBottom:6 }}>
-                No pending requests
-              </div>
-              <div style={{ fontSize:13, color:'var(--text-tertiary)' }}>
-                New access requests will appear here for your review.
-              </div>
-            </div>
-          ) : (
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {pending.map(p => (
-                <div key={p.id} style={{ ...cardStyle, padding:'20px' }}>
-                  <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
-                    <div style={{
-                      width:46, height:46, borderRadius:'50%',
-                      background:'linear-gradient(135deg,#d97706,#f59e0b)',
-                      display:'flex', alignItems:'center', justifyContent:'center',
-                      fontSize:16, fontWeight:700, color:'#fff', flexShrink:0,
-                    }}>
-                      {p.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
-                    </div>
-                    <div style={{ flex:1, minWidth:200 }}>
-                      {/* Identity */}
-                      <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:4 }}>
-                        <span style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>{p.name}</span>
-                        {p.role_in_project && (
-                          <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20,
-                                         background:'rgba(124,58,237,0.10)', color:'#7c3aed',
-                                         border:'1px solid rgba(124,58,237,0.20)', fontWeight:600 }}>
-                            {p.role_in_project}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ fontSize:13, color:'var(--text-secondary)', marginBottom:2 }}>{p.email}</div>
-                      {p.institution && (
-                        <div style={{ fontSize:12, color:'var(--text-secondary)', marginBottom:2 }}>
-                          🏛 {p.institution}
-                          {p.position && <span style={{ color:'var(--text-tertiary)' }}> · {p.position}</span>}
-                        </div>
-                      )}
-
-                      {/* Project details grid */}
-                      <div style={{ display:'flex', gap:16, flexWrap:'wrap', marginTop:8,
-                                    padding:'10px 14px', borderRadius:8,
-                                    background: dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',
-                                    border:`1px solid ${border}` }}>
-                        {[
-                          ['Workspace', p.workspace_name + (p.report_header&&p.report_header!==p.workspace_name ? ` (${p.report_header})` : '')],
-                          p.research_area && ['Research Area', p.research_area],
-                          p.funding_source && ['Funding', p.funding_source],
-                          p.project_nature && ['Project Type', p.project_nature],
-                        ].filter(Boolean).map(([k,v]) => (
-                          <div key={k}>
-                            <div style={{ fontSize:10, fontWeight:600, textTransform:'uppercase',
-                                          letterSpacing:'0.06em', color:'var(--text-tertiary)', marginBottom:2 }}>
-                              {k}
-                            </div>
-                            <div style={{ fontSize:12, color:'var(--text-primary)', fontWeight:500 }}>{v}</div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {p.message && (
-                        <div style={{
-                          marginTop:10, padding:'10px 14px', borderRadius:8,
-                          borderLeft:'3px solid #d97706', fontSize:13,
-                          background: dark?'rgba(217,119,6,0.08)':'rgba(217,119,6,0.05)',
-                          color:'var(--text-secondary)', fontStyle:'italic',
-                        }}>
-                          "{p.message}"
-                        </div>
-                      )}
-                      <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:8 }}>
-                        Requested {timeAgo(p.created_at)}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div style={{ display:'flex', flexDirection:'column', gap:8, flexShrink:0 }}>
-                      <button className="btn btn-success btn-sm"
-                        disabled={approving===p.id} style={{ minWidth:110 }}
-                        onClick={() => handleApprove(p.id, p.name)}>
-                        {approving===p.id ? '…' : '✓ Approve'}
-                      </button>
-                      <button className="btn btn-outline btn-sm"
-                        disabled={rejecting===p.id}
-                        style={{ minWidth:110, color:'var(--danger)', borderColor:'var(--danger)' }}
-                        onClick={() => handleReject(p.id, p.name)}>
-                        {rejecting===p.id ? '…' : '✕ Reject'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
+          </>
         )}
 
-        {/* ── WORKSPACES TAB ───────────────────────────────── */}
+        {/* ── WORKSPACES TAB ─────────────────────────── */}
         {tab==='workspaces' && (
-          <div style={{ display:'grid', gridTemplateColumns: drillId ? '1fr 1fr' : '1fr', gap:16 }}>
+          <div style={S.card}>
+            <div style={{ padding:'14px 18px',
+                          borderBottom:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)'}`,
+                          display:'flex', gap:10, flexWrap:'wrap', alignItems:'center' }}>
+              <input placeholder="Search workspaces, institution…"
+                value={search} onChange={e=>setSearch(e.target.value)}
+                style={{ ...S.input, flex:1, minWidth:160, marginBottom:0, width:'auto' }} />
+              <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{
+                ...S.input, marginBottom:0, width:'auto', cursor:'pointer',
+              }}>
+                <option value="last_active">Last active</option>
+                <option value="newest">Newest first</option>
+                <option value="name">Name A–Z</option>
+                <option value="users">Most users</option>
+                <option value="projects">Most projects</option>
+              </select>
+              <span style={{ fontSize:12, color:'var(--text-tertiary)', whiteSpace:'nowrap' }}>
+                {filtered.length} workspace{filtered.length!==1?'s':''}
+              </span>
+            </div>
 
-            {/* Workspace list */}
-            <div style={cardStyle}>
-              {/* Toolbar */}
-              <div style={{ padding:'12px 16px',
-                            borderBottom:`1px solid ${border}`,
-                            display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
-                <input placeholder="Search by name, admin, institution…"
-                  value={search} onChange={e=>setSearch(e.target.value)}
-                  style={{
-                    flex:1, minWidth:140, padding:'7px 12px', fontSize:13, borderRadius:8,
-                    border:`1px solid ${border}`, outline:'none',
-                    background: dark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.03)',
-                    color:'var(--text-primary)',
-                  }} />
-                <select value={filterType} onChange={e=>setFilterType(e.target.value)} style={{
-                  padding:'7px 10px', fontSize:12, borderRadius:8, cursor:'pointer',
-                  border:`1px solid ${border}`,
-                  background: dark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.03)',
-                  color:'var(--text-primary)',
-                }}>
-                  <option value="all">All</option>
-                  <option value="active">With projects</option>
-                  <option value="ghost">Ghost (no projects)</option>
-                </select>
-                <select value={sortBy} onChange={e=>setSortBy(e.target.value)} style={{
-                  padding:'7px 10px', fontSize:12, borderRadius:8, cursor:'pointer',
-                  border:`1px solid ${border}`,
-                  background: dark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.03)',
-                  color:'var(--text-primary)',
-                }}>
-                  <option value="last_active">Last active</option>
-                  <option value="newest">Newest</option>
-                  <option value="name">Name A–Z</option>
-                  <option value="users">Most users</option>
-                  <option value="projects">Most projects</option>
-                </select>
+            {filtered.length === 0 ? (
+              <div style={{ padding:48, textAlign:'center', color:'var(--text-tertiary)', fontSize:14 }}>
+                {search ? 'No workspaces match' : 'No workspaces yet'}
               </div>
+            ) : filtered.map((w, i) => {
+              const status  = activityStatus(w.last_active);
+              const isOpen  = expanded === w.id;
+              const total   = parseInt(w.admin_count||0) + parseInt(w.member_count||0);
+              const wsMembers = members[w.id];
+              const loadingM  = membersLoading[w.id];
 
-              {/* Rows */}
-              {filtered.length === 0 ? (
-                <div style={{ padding:40, textAlign:'center', color:'var(--text-tertiary)', fontSize:13 }}>
-                  {search || filterType!=='all' ? 'No workspaces match' : 'No workspaces yet'}
-                </div>
-              ) : filtered.map((w, i) => {
-                const st   = activityStatus(w.last_active);
-                const open = drillId === w.id;
-                const total = parseInt(w.admin_count||0)+parseInt(w.member_count||0);
-                return (
-                  <div key={w.id} style={{
-                    borderBottom: i<filtered.length-1 ? `1px solid ${border}` : 'none',
-                    background: open ? hoverBg : 'transparent',
-                  }}>
-                    <div onClick={() => loadDrill(w.id)} style={{
-                      padding:'12px 16px', cursor:'pointer',
-                      display:'flex', alignItems:'center', gap:10,
+              return (
+                <div key={w.id} style={{
+                  borderBottom: i < filtered.length-1
+                    ? `1px solid ${theme==='dark'?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)'}` : 'none'
+                }}>
+                  {/* Main row */}
+                  <div
+                    onClick={() => handleExpand(w.id)}
+                    style={{
+                      padding:'14px 18px', cursor:'pointer',
+                      display:'flex', alignItems:'center', gap:12, flexWrap:'wrap',
+                      background: isOpen
+                        ? (theme==='dark'?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.02)')
+                        : 'transparent',
                       transition:'background 0.12s',
                     }}
-                      onMouseEnter={e => !open && (e.currentTarget.style.background=hoverBg)}
-                      onMouseLeave={e => !open && (e.currentTarget.style.background='transparent')}>
-
-                      {/* Activity dot */}
-                      <div title={st.label} style={{
-                        width:8, height:8, borderRadius:'50%', background:st.dot, flexShrink:0,
-                        boxShadow: st.dot==='#16a34a'?`0 0 6px ${st.dot}88`:'none',
-                      }} />
-
-                      {/* Name + admin */}
-                      <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontWeight:600, fontSize:13, color:'var(--text-primary)',
-                                      overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {w.name}
+                    onMouseEnter={e => !isOpen && (e.currentTarget.style.background = theme==='dark'?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.015)')}
+                    onMouseLeave={e => !isOpen && (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <div title={status.label} style={{
+                      width:9, height:9, borderRadius:'50%',
+                      background:status.color, flexShrink:0,
+                      boxShadow: status.color==='#16a34a' ? `0 0 8px ${status.color}88` : 'none',
+                    }} />
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontWeight:600, fontSize:14, color:'var(--text-primary)',
+                                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                        {w.name}
+                      </div>
+                      {(w.institution || w.pi_position) && (
+                        <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:1 }}>
+                          {[w.pi_position, w.institution].filter(Boolean).join(' · ')}
                         </div>
-                        {w.admin_name && (
-                          <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:1,
-                                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                            {w.admin_name}
-                            {w.admin_institution && ` · ${w.admin_institution}`}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Counts */}
-                      <div style={{ display:'flex', gap:4, flexShrink:0 }}>
-                        {[
-                          { v:total, icon:'👥', title:'users' },
-                          { v:w.active_project_count, icon:'📁', title:'projects' },
-                          { v:w.expense_count, icon:'🧾', title:'expenses' },
-                        ].map(({v,icon,title}) => (
-                          <span key={title} title={title} style={{
-                            fontSize:10, padding:'2px 7px', borderRadius:12,
-                            background: dark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.05)',
-                            color:'var(--text-secondary)',
-                            border:`1px solid ${border}`,
-                          }}>{icon} {v}</span>
-                        ))}
-                      </div>
-
-                      {/* Time */}
-                      <div style={{ fontSize:10, color:'var(--text-tertiary)',
-                                    minWidth:60, textAlign:'right', flexShrink:0 }}>
-                        {timeAgo(w.last_active)}
-                      </div>
-
-                      <div style={{ fontSize:9, color:'var(--text-tertiary)', flexShrink:0,
-                                    transition:'transform 0.2s',
-                                    transform: open?'rotate(180deg)':'rotate(0)' }}>▼</div>
+                      )}
                     </div>
+                    <div style={{
+                      fontSize:10, padding:'3px 8px', borderRadius:20, flexShrink:0,
+                      background:status.bg, color:status.color,
+                      border:`1px solid ${status.color}33`, fontWeight:600,
+                    }}>{status.label}</div>
+                    <div style={{ display:'flex', gap:5, flexShrink:0 }}>
+                      {[
+                        { icon:'👥', val:`${total} user${total!==1?'s':''}` },
+                        { icon:'📁', val:`${w.project_count} proj${w.project_count!==1?'s':''}` },
+                      ].map(({icon,val}) => (
+                        <span key={val} style={{
+                          fontSize:11, padding:'3px 8px', borderRadius:20,
+                          background: theme==='dark'?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.05)',
+                          color:'var(--text-secondary)',
+                          border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.10)':'rgba(0,0,0,0.08)'}`,
+                        }}>{icon} {val}</span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize:11, color:'var(--text-tertiary)', minWidth:60, textAlign:'right', flexShrink:0 }}>
+                      {timeAgo(w.last_active)}
+                    </div>
+                    <div style={{ fontSize:10, color:'var(--text-tertiary)', flexShrink:0,
+                                  transition:'transform 0.2s',
+                                  transform: isOpen?'rotate(180deg)':'rotate(0)' }}>▼</div>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Drill-down panel */}
-            {drillId && (
-              <div style={cardStyle}>
-                {drillLoading ? (
-                  <div style={{ padding:48, textAlign:'center' }}><div className="spinner" /></div>
-                ) : drillData ? (
-                  <>
-                    {/* Drill header */}
-                    <div style={{ padding:'14px 18px', borderBottom:`1px solid ${border}`,
-                                  display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                      <div>
-                        <div style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>
-                          {drillData.workspace.name}
-                        </div>
-                        {drillData.workspace.report_header && drillData.workspace.report_header !== drillData.workspace.name && (
-                          <div style={{ fontSize:11, color:'var(--text-tertiary)' }}>
-                            {drillData.workspace.report_header}
+                  {/* Expanded detail */}
+                  {isOpen && (
+                    <div style={{
+                      padding:'16px 20px 20px 40px',
+                      background: theme==='dark'?'rgba(0,0,0,0.25)':'rgba(0,0,0,0.015)',
+                      borderTop:`1px solid ${theme==='dark'?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)'}`,
+                    }}>
+                      {/* Metadata row */}
+                      <div style={{ display:'flex', gap:24, flexWrap:'wrap', marginBottom:14 }}>
+                        {[
+                          ['Created',     new Date(w.created_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})],
+                          ['PI Role',     w.pi_position || '—'],
+                          ['Degree',      w.academic_degree || '—'],
+                          ['Research',    w.research_area ? w.research_area.substring(0,30)+(w.research_area.length>30?'…':'') : '—'],
+                          ['Funded by',   w.granting_agency || '—'],
+                          ['Admins',      w.admin_count],
+                          ['Researchers', w.member_count],
+                          ['Projects',    `${w.active_project_count} active / ${w.project_count} total`],
+                          ['Last active', timeAgo(w.last_active)],
+                        ].map(([k,v]) => (
+                          <div key={k}>
+                            <div style={{ fontSize:10, fontWeight:600, textTransform:'uppercase',
+                                          letterSpacing:'0.06em', color:'var(--text-tertiary)', marginBottom:3 }}>{k}</div>
+                            <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)' }}>{v}</div>
                           </div>
-                        )}
-                        <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:3 }}>
-                          Created {fmtDate(drillData.workspace.created_at)}
+                        ))}
+                      </div>
+
+                      {/* Members list */}
+                      <div style={{ marginBottom:14 }}>
+                        <div style={{ fontSize:11, fontWeight:700, textTransform:'uppercase',
+                                      letterSpacing:'0.06em', color:'var(--text-tertiary)', marginBottom:8 }}>
+                          Team Members ({total})
                         </div>
-                      </div>
-                      <div style={{ display:'flex', gap:6 }}>
-                        <button className="btn btn-ghost btn-sm"
-                          style={{ fontSize:11, color:'var(--text-tertiary)' }}
-                          title="Contact the workspace owner to request deletion. Workspaces cannot be deleted directly to protect user data."
-                          onClick={() => alert(`To remove the workspace "${drillData.workspace.name}", please contact the workspace owner at ${drillData.members.find(m=>m.role==='admin')?.email || 'their registered email'} and ask them to delete their own workspace from Settings. This protects against accidental data loss.`)}>
-                          ⚠️ Request Removal
-                        </button>
-                        <button className="btn btn-ghost btn-sm"
-                          onClick={() => { setDrillId(null); setDrillData(null); }}>
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    <div style={{ padding:'16px 18px', overflowY:'auto', maxHeight:'calc(100vh - 280px)' }}>
-
-                      {/* Admin contacts */}
-                      <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase',
-                                    letterSpacing:'0.06em', color:'var(--text-tertiary)', marginBottom:8 }}>
-                        Team ({drillData.members.length})
-                      </div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:6, marginBottom:20 }}>
-                        {drillData.members.map(m => (
-                          <div key={m.id} style={{
-                            display:'flex', alignItems:'center', gap:10, padding:'8px 10px',
-                            borderRadius:8,
-                            background: dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.02)',
-                            border:`1px solid ${border}`,
-                          }}>
-                            <div style={{
-                              width:30, height:30, borderRadius:'50%', flexShrink:0,
-                              background: m.role==='admin'?'#7c3aed':'#6b7280',
-                              display:'flex', alignItems:'center', justifyContent:'center',
-                              fontSize:11, fontWeight:700, color:'#fff',
-                            }}>
-                              {m.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
-                            </div>
-                            <div style={{ flex:1, minWidth:0 }}>
-                              <div style={{ fontSize:13, fontWeight:600, color:'var(--text-primary)' }}>
-                                {m.name}
-                                {m.role==='admin' && (
-                                  <span style={{ marginLeft:6, fontSize:10, color:'#7c3aed',
-                                                 fontWeight:600 }}>⭐ admin</span>
-                                )}
-                              </div>
-                              <div style={{ fontSize:11, color:'var(--text-tertiary)',
-                                            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                                {m.email}
-                                {m.institution && ` · ${m.institution}`}
-                              </div>
-                              {(m.designation||m.position||m.role_in_project) && (
-                                <div style={{ fontSize:10, color:'var(--text-tertiary)', marginTop:1 }}>
-                                  {[m.role_in_project, m.designation||m.position].filter(Boolean).join(' · ')}
+                        {loadingM ? (
+                          <div style={{ fontSize:12, color:'var(--text-tertiary)' }}>Loading…</div>
+                        ) : wsMembers && wsMembers.length > 0 ? (
+                          <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
+                            {wsMembers.map(m => (
+                              <div key={m.id} style={{
+                                display:'flex', alignItems:'center', gap:6, padding:'5px 10px',
+                                borderRadius:20, fontSize:12,
+                                background: m.role==='admin'
+                                  ? 'rgba(124,58,237,0.10)' : 'rgba(0,0,0,0.05)',
+                                border: m.role==='admin'
+                                  ? '1px solid rgba(124,58,237,0.20)'
+                                  : `1px solid ${theme==='dark'?'rgba(255,255,255,0.10)':'rgba(0,0,0,0.08)'}`,
+                                color: m.role==='admin' ? '#7c3aed' : 'var(--text-secondary)',
+                              }}>
+                                <div style={{
+                                  width:18, height:18, borderRadius:'50%',
+                                  background: m.role==='admin' ? '#7c3aed' : '#6b7280',
+                                  display:'flex', alignItems:'center', justifyContent:'center',
+                                  fontSize:8, fontWeight:700, color:'#fff', flexShrink:0,
+                                }}>
+                                  {m.name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2)}
                                 </div>
-                              )}
-                            </div>
-                            <div style={{ fontSize:10, color:'var(--text-tertiary)', flexShrink:0 }}>
-                              {timeAgo(m.last_active)}
-                            </div>
+                                <span style={{ fontWeight: m.role==='admin'?600:400 }}>{m.name}</span>
+                                {m.position && <span style={{ opacity:0.6, fontSize:10 }}>· {m.position}</span>}
+                                <span style={{ fontSize:9, opacity:0.5 }}>
+                                  {activityStatus(m.last_active).label}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                        {drillData.members.length === 0 && (
-                          <div style={{ fontSize:13, color:'var(--text-tertiary)' }}>No members yet</div>
+                        ) : (
+                          <div style={{ fontSize:12, color:'var(--text-tertiary)' }}>No members yet</div>
                         )}
                       </div>
 
-                      {/* Projects list */}
-                      <div style={{ fontSize:11, fontWeight:600, textTransform:'uppercase',
-                                    letterSpacing:'0.06em', color:'var(--text-tertiary)', marginBottom:8 }}>
-                        Recent Projects ({drillData.projects.length})
-                      </div>
-                      <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
-                        {drillData.projects.map(p => (
-                          <div key={p.id} style={{
-                            display:'flex', alignItems:'center', gap:8, padding:'6px 10px',
-                            borderRadius:6,
-                            background: dark?'rgba(255,255,255,0.03)':'rgba(0,0,0,0.02)',
-                          }}>
-                            <span style={{ fontSize:11, fontWeight:700, color:'var(--accent)',
-                                           minWidth:60 }}>{p.code}</span>
-                            <span style={{ flex:1, fontSize:12, color:'var(--text-primary)',
-                                           overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                              {p.name}
-                            </span>
-                            <span className={`badge ${p.status==='active'?'badge-green':p.archived?'badge-gray':'badge-teal'}`}
-                              style={{ fontSize:9 }}>
-                              {p.archived ? 'archived' : p.status}
-                            </span>
-                          </div>
-                        ))}
-                        {drillData.projects.length === 0 && (
-                          <div style={{ fontSize:13, color:'var(--text-tertiary)' }}>
-                            No projects — this is a ghost workspace
-                          </div>
-                        )}
+                      {/* Delete */}
+                      <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                        <button className="btn btn-danger btn-sm"
+                          disabled={deleting===w.id}
+                          onClick={e => { e.stopPropagation(); handleDeleteWorkspace(w.id, w.name); }}>
+                          {deleting===w.id ? '⏳ Deleting…' : '🗑 Delete Workspace'}
+                        </button>
+                        <span style={{ fontSize:11, color:'var(--text-tertiary)' }}>
+                          Financial data is private — you cannot view expenses or budgets.
+                        </span>
                       </div>
                     </div>
-                  </>
-                ) : null}
-              </div>
-            )}
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        {/* Activity legend */}
-        <div style={{ marginTop:14, display:'flex', gap:18, fontSize:11,
-                      color:'var(--text-tertiary)', flexWrap:'wrap' }}>
+        {/* Legend */}
+        <div style={{ marginTop:14, display:'flex', gap:18, fontSize:11, color:'var(--text-tertiary)', flexWrap:'wrap' }}>
           {[['#16a34a','Active this week'],['#d97706','Active this month'],['#6b7280','Inactive / never']].map(([c,l]) => (
             <div key={l} style={{ display:'flex', alignItems:'center', gap:5 }}>
               <div style={{ width:7, height:7, borderRadius:'50%', background:c }} />{l}
@@ -888,74 +825,114 @@ export default function SuperAdmin() {
         </div>
       </div>
 
-      {/* ── Delete-workspace confirmation modal ─────────── */}
-      {deleteConfirm && (
-        <div style={{
-          position:'fixed', inset:0, zIndex:999,
-          background:'rgba(0,0,0,0.75)', backdropFilter:'blur(4px)',
-          display:'flex', alignItems:'center', justifyContent:'center', padding:24,
-        }} onClick={() => setDeleteConfirm(null)}>
+      {/* ── Analytics Panel ─────────────────────────── */}
+      {analyticsOpen && (
+        <>
+          <div onClick={() => setAnalyticsOpen(false)} style={{
+            position:'fixed', inset:0, background:'rgba(0,0,0,0.40)',
+            zIndex:200, backdropFilter:'blur(4px)',
+          }} />
           <div style={{
-            background: dark?'#1a1d1a':'#fff',
-            border:`1px solid rgba(239,68,68,0.35)`,
-            borderRadius:16, padding:'28px 28px 24px',
-            maxWidth:440, width:'100%', boxShadow:'0 24px 64px rgba(0,0,0,0.5)',
-          }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize:28, marginBottom:10, textAlign:'center' }}>⚠️</div>
-            <div style={{ fontSize:17, fontWeight:800, color:'var(--text-primary)',
-                          textAlign:'center', marginBottom:8 }}>
-              Delete Workspace?
-            </div>
-            <div style={{ fontSize:13, color:'var(--text-secondary)', textAlign:'center',
-                          marginBottom:20, lineHeight:1.7 }}>
-              This will <strong style={{ color:'#f87171' }}>permanently remove</strong> workspace{' '}
-              <strong>"{deleteConfirm.name}"</strong> along with all its members, projects, and expenses.
-              <br /><br />
-              <span style={{ color:'var(--text-tertiary)', fontSize:12 }}>
-                This cannot be undone. If this team is actively using the workspace,
-                they will immediately lose all their data.
-              </span>
-            </div>
-            <div style={{ fontSize:12, fontWeight:700, color:'var(--text-secondary)', marginBottom:6 }}>
-              Type the workspace name to confirm:
-            </div>
+            position:'fixed', top:0, right:0, bottom:0, width:420,
+            background: theme==='dark' ? '#1c1c1e' : '#ffffff',
+            zIndex:201, boxShadow:'-8px 0 40px rgba(0,0,0,0.20)',
+            display:'flex', flexDirection:'column', overflowY:'auto',
+          }}>
             <div style={{
-              fontSize:12, color:'#f87171', marginBottom:8,
-              padding:'6px 10px', borderRadius:6, fontFamily:'monospace',
-              background: dark?'rgba(239,68,68,0.08)':'rgba(239,68,68,0.05)',
-              border:'1px solid rgba(239,68,68,0.20)',
+              padding:'16px 20px', position:'sticky', top:0, zIndex:1,
+              background: theme==='dark' ? '#1c1c1e' : '#ffffff',
+              borderBottom:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'}`,
+              display:'flex', justifyContent:'space-between', alignItems:'center',
             }}>
-              {deleteConfirm.name}
+              <span style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>📊 Platform Analytics</span>
+              <button onClick={() => setAnalyticsOpen(false)} style={{
+                background:'none', border:'none', cursor:'pointer', fontSize:22,
+                color:'var(--text-tertiary)', lineHeight:1,
+              }}>×</button>
             </div>
-            <input
-              autoFocus
-              value={deleteInput}
-              onChange={e => setDeleteInput(e.target.value)}
-              placeholder="Type workspace name exactly…"
-              style={{
-                width:'100%', boxSizing:'border-box',
-                padding:'9px 12px', fontSize:13, borderRadius:8, marginBottom:16,
-                border:`1px solid ${deleteInput === deleteConfirm.name ? '#ef4444' : border}`,
-                background: dark?'rgba(255,255,255,0.06)':'#f8f8f8',
-                color:'var(--text-primary)', outline:'none',
-              }}
-            />
-            <div style={{ display:'flex', gap:10 }}>
-              <button className="btn btn-ghost" style={{ flex:1 }}
-                onClick={() => { setDeleteConfirm(null); setDeleteInput(''); }}>
-                Cancel
-              </button>
-              <button className="btn btn-danger" style={{ flex:1 }}
-                disabled={deleteInput !== deleteConfirm.name || !!deleting}
-                onClick={handleDeleteConfirmed}>
-                {deleting ? '…Deleting' : '🗑 Delete Forever'}
-              </button>
+
+            <div style={{ padding:20, display:'flex', flexDirection:'column', gap:20 }}>
+
+              {/* Platform Summary */}
+              <div>
+                <div style={S.sectionTitle}>Platform Summary</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  {stats && [
+                    ['Total Workspaces', stats.total_workspaces, '#7c3aed'],
+                    ['Total Admins (PIs)', stats.total_admins, '#2563eb'],
+                    ['Total Researchers', stats.total_members, '#059669'],
+                    ['Active Projects', stats.active_projects, '#d97706'],
+                    ['Completed Projects', stats.completed_projects, '#6b7280'],
+                    ['Total Expenses Filed', stats.total_expenses, '#0891b2'],
+                    ['Users active (7d)', stats.active_users_7d, '#16a34a'],
+                    ['Users active (24h)', stats.active_users_24h, '#16a34a'],
+                    ['Avg team size', stats.avg_team_size, '#7c3aed'],
+                    ['New workspaces (30d)', stats.new_workspaces_30d, '#7c3aed'],
+                  ].map(([k,v,c]) => (
+                    <div key={k} style={{
+                      padding:'10px 12px', borderRadius:10,
+                      background: theme==='dark'?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)',
+                      border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)'}`,
+                    }}>
+                      <div style={{ fontSize:20, fontWeight:800, color:c }}>{v}</div>
+                      <div style={{ fontSize:10, color:'var(--text-tertiary)', marginTop:2 }}>{k}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Growth chart */}
+              {stats?.monthly_growth?.length > 0 && (
+                <div>
+                  <div style={S.sectionTitle}>Workspace Growth (6 months)</div>
+                  <MiniBarChart data={stats.monthly_growth} color="#7c3aed" />
+                </div>
+              )}
+
+              {/* Degree breakdown */}
+              {stats?.degree_breakdown?.length > 0 && (
+                <div>
+                  <div style={S.sectionTitle}>PI Qualifications</div>
+                  <HorizBars data={stats.degree_breakdown} />
+                </div>
+              )}
+
+              {/* Agencies */}
+              {stats?.top_agencies?.length > 0 && (
+                <div>
+                  <div style={S.sectionTitle}>Granting Agencies</div>
+                  <HorizBars data={stats.top_agencies} />
+                </div>
+              )}
+
+              {/* Research areas */}
+              {stats?.top_research_areas?.length > 0 && (
+                <div>
+                  <div style={S.sectionTitle}>Research Domains</div>
+                  <HorizBars data={stats.top_research_areas} />
+                </div>
+              )}
+
+              {/* Institutions */}
+              {stats?.top_institutions?.length > 0 && (
+                <div>
+                  <div style={S.sectionTitle}>Top Institutions</div>
+                  <HorizBars data={stats.top_institutions} />
+                </div>
+              )}
+
+              <div style={{ fontSize:11, color:'var(--text-tertiary)', padding:'12px', borderRadius:8,
+                             background:'rgba(124,58,237,0.06)', border:'1px solid rgba(124,58,237,0.15)' }}>
+                💡 <strong>Monetization insight:</strong> These analytics show your platform's PI demographics,
+                funding patterns, and research domains. Use this data to target grant agencies,
+                institutional partnerships, and premium feature offerings.
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* ── Profile panel ──────────────────────────────── */}
+      {/* ── Profile Panel ─────────────────────────── */}
       {profileOpen && (
         <>
           <div onClick={() => setProfileOpen(false)} style={{
@@ -964,60 +941,61 @@ export default function SuperAdmin() {
           }} />
           <div style={{
             position:'fixed', top:0, right:0, bottom:0, width:340,
-            background: dark?'#1c1c1e':'#fff',
+            background: theme==='dark' ? '#1c1c1e' : '#ffffff',
             zIndex:201, boxShadow:'-8px 0 40px rgba(0,0,0,0.20)',
             display:'flex', flexDirection:'column', overflowY:'auto',
           }}>
             <div style={{
               padding:'16px 20px', position:'sticky', top:0, zIndex:1,
-              background: dark?'#1c1c1e':'#fff',
-              borderBottom:`1px solid ${border}`,
+              background: theme==='dark' ? '#1c1c1e' : '#ffffff',
+              borderBottom:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.08)'}`,
               display:'flex', justifyContent:'space-between', alignItems:'center',
             }}>
               <span style={{ fontWeight:700, fontSize:15, color:'var(--text-primary)' }}>My Account</span>
               <button onClick={() => setProfileOpen(false)} style={{
-                background:'none', border:'none', cursor:'pointer',
-                fontSize:22, color:'var(--text-tertiary)', lineHeight:1,
+                background:'none', border:'none', cursor:'pointer', fontSize:22,
+                color:'var(--text-tertiary)', lineHeight:1,
               }}>×</button>
             </div>
 
-            <div style={{ padding:20, display:'flex', flexDirection:'column', gap:20 }}>
-              {/* Avatar */}
+            <div style={{ padding:20, display:'flex', flexDirection:'column', gap:22 }}>
               <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:10 }}>
                 <div style={{
-                  width:72, height:72, borderRadius:'50%', background:'#7c3aed',
+                  width:76, height:76, borderRadius:'50%', background:'#7c3aed',
                   display:'flex', alignItems:'center', justifyContent:'center',
-                  overflow:'hidden', border:'3px solid rgba(124,58,237,0.3)',
+                  overflow:'hidden', border:'3px solid rgba(124,58,237,0.30)',
                 }}>
-                  {(avatar||user?.avatar_url)
-                    ? <img src={avatar||user?.avatar_url} alt=""
+                  {(avatarPreview||user?.avatar_url)
+                    ? <img src={avatarPreview||user?.avatar_url} alt=""
                         style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                    : <span style={{ fontSize:22, fontWeight:700, color:'#fff' }}>{initials}</span>}
+                    : <span style={{ fontSize:24, fontWeight:700, color:'#fff' }}>{initials}</span>}
                 </div>
-                <input type="file" accept="image/*" id="sa-av" style={{ display:'none' }}
-                  onChange={e => compressAvatar(e.target.files[0])} />
-                <label htmlFor="sa-av" style={{
-                  padding:'6px 14px', border:`1px solid ${border}`, borderRadius:8,
-                  cursor:'pointer', fontSize:12, color:'var(--text-secondary)',
-                  background: dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.03)',
+                <input type="file" accept="image/*" id="sa-avatar"
+                  style={{ display:'none' }} onChange={handleAvatarFile} />
+                <label htmlFor="sa-avatar" style={{
+                  padding:'6px 14px',
+                  border:`1px solid ${theme==='dark'?'rgba(255,255,255,0.16)':'rgba(0,0,0,0.15)'}`,
+                  borderRadius:8, cursor:'pointer', fontSize:12, color:'var(--text-secondary)',
+                  background: theme==='dark'?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.03)',
                 }}>📁 Upload photo</label>
                 <div style={{ display:'flex', gap:6, width:'100%' }}>
-                  <Input placeholder="Or paste image URL…" value={urlIn}
-                    onChange={e=>setUrlIn(e.target.value)}
-                    onKeyDown={e=>e.key==='Enter'&&setAvatar(urlIn.trim())}
-                    style={{ marginBottom:0, fontSize:12 }} />
+                  <input placeholder="Or paste image URL…"
+                    value={urlInput} onChange={e=>setUrlInput(e.target.value)}
+                    onKeyDown={e => e.key==='Enter' && setAP(urlInput.trim())}
+                    style={{ ...S.input, flex:1, marginBottom:0, fontSize:12 }} />
                   <button className="btn btn-outline btn-sm"
-                    onClick={() => { setAvatar(urlIn.trim()); setUrlIn(''); }}>Use</button>
+                    onClick={() => { setAP(urlInput.trim()); setUrlInput(''); }}>Use</button>
                 </div>
+                {avatarPreview && (
+                  <button className="btn btn-ghost btn-sm"
+                    style={{ color:'var(--danger)', fontSize:11 }}
+                    onClick={() => setAP('')}>Remove photo</button>
+                )}
               </div>
 
-              {/* Name */}
               <div>
-                <label style={{ display:'block', fontSize:11, fontWeight:600, letterSpacing:'0.06em',
-                                textTransform:'uppercase', color:'var(--text-tertiary)', marginBottom:6 }}>
-                  Display Name
-                </label>
-                <Input value={pName} onChange={e=>setPName(e.target.value)} />
+                <label style={S.label}>Display Name</label>
+                <input value={pName} onChange={e=>setPName(e.target.value)} style={S.input} />
                 <button className="btn btn-primary btn-sm" onClick={saveProfile}
                   style={{ width:'100%', justifyContent:'center' }}>
                   Save Name & Photo
@@ -1025,41 +1003,37 @@ export default function SuperAdmin() {
                 <Msg m={pMsg} />
               </div>
 
-              {/* Password */}
-              <div style={{ borderTop:`1px solid ${border}`, paddingTop:16 }}>
-                <label style={{ display:'block', fontSize:11, fontWeight:600, letterSpacing:'0.06em',
-                                textTransform:'uppercase', color:'var(--text-tertiary)', marginBottom:8 }}>
-                  Change Password
-                </label>
-                {[['cur','Current password'],['nw','New password (min 8)'],['cf','Confirm new']].map(([k,ph]) => (
-                  <Input key={k} type="password" placeholder={ph}
-                    value={pw[k]} onChange={e=>setPw(p=>({...p,[k]:e.target.value}))} />
+              <div style={{ borderTop:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)'}`, paddingTop:18 }}>
+                <label style={S.label}>Change Password</label>
+                {[
+                  [pw.current, v=>setPw(p=>({...p,current:v})), 'Current password'],
+                  [pw.newpw,   v=>setPw(p=>({...p,newpw:v})),   'New password (min 8)'],
+                  [pw.confirm, v=>setPw(p=>({...p,confirm:v})), 'Confirm new password'],
+                ].map(([val,onChange,ph],i) => (
+                  <input key={i} type="password" placeholder={ph}
+                    value={val} onChange={e=>onChange(e.target.value)} style={S.input} />
                 ))}
                 <button className="btn btn-outline btn-sm" onClick={changePassword}
-                  style={{ width:'100%', justifyContent:'center' }}>
-                  Change Password
-                </button>
+                  style={{ width:'100%', justifyContent:'center' }}>Change Password</button>
                 <Msg m={pwMsg} />
               </div>
 
-              {/* Email */}
-              <div style={{ borderTop:`1px solid ${border}`, paddingTop:16 }}>
-                <label style={{ display:'block', fontSize:11, fontWeight:600, letterSpacing:'0.06em',
-                                textTransform:'uppercase', color:'var(--text-tertiary)', marginBottom:4 }}>
-                  Change Email
-                </label>
+              <div style={{ borderTop:`1px solid ${theme==='dark'?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)'}`, paddingTop:18 }}>
+                <label style={S.label}>Change Email</label>
                 <div style={{ fontSize:11, color:'var(--text-tertiary)', marginBottom:8 }}>
-                  Current: <strong>{user?.email}</strong><br/>Signing out required after change.
+                  Current: <strong>{user?.email}</strong><br />You will be signed out after changing.
                 </div>
-                <Input type="email" placeholder="New email"
-                  value={emailF.new_email} onChange={e=>setEmailF(f=>({...f,new_email:e.target.value}))} />
-                <Input type="password" placeholder="Confirm with your password"
-                  value={emailF.password} onChange={e=>setEmailF(f=>({...f,password:e.target.value}))} />
+                <input type="email" placeholder="New email"
+                  value={emailF.new_email}
+                  onChange={e=>setEmailF(f=>({...f,new_email:e.target.value}))}
+                  style={S.input} />
+                <input type="password" placeholder="Confirm with password"
+                  value={emailF.password}
+                  onChange={e=>setEmailF(f=>({...f,password:e.target.value}))}
+                  style={S.input} />
                 <button className="btn btn-outline btn-sm" onClick={changeEmail}
-                  style={{ width:'100%', justifyContent:'center' }}>
-                  Change Email
-                </button>
-                <Msg m={emMsg} />
+                  style={{ width:'100%', justifyContent:'center' }}>Change Email</button>
+                <Msg m={emailMsg} />
               </div>
             </div>
           </div>
