@@ -34,7 +34,7 @@ export default function Login() {
         </div>
 
         <div className="hero-content">
-          <div className="hero-eyebrow">ResearchTrack · v15</div>
+          <div className="hero-eyebrow">ResearchTrack</div>
           <h1 className="hero-headline">
             Research<br /><span>Expense</span><br />Tracker
           </h1>
@@ -49,7 +49,7 @@ export default function Login() {
             {[
               { icon:'🔒', title:'Completely private', desc:'Your workspace is isolated. No university, no department, no one else can access your data.' },
               { icon:'💰', title:'Full budget tracking', desc:'Fund installments, expense categories, reimbursement status — all in one place.' },
-              { icon:'📊', title:'One-click reports', desc:'Generate PDF and Excel reports for your PI (Principal Investigator), university, or funding body instantly.' },
+              { icon:'📊', title:'One-click reports', desc:'Generate PDF and Excel reports for your PI, university, or funding body instantly.' },
               { icon:'👥', title:'Team collaboration', desc:'Add researchers, assign them to projects. Each person sees only what they need.' },
             ].map((f,i) => (
               <div key={i} className="hero-feature">
@@ -91,7 +91,8 @@ export default function Login() {
           </div>
 
           <div style={{ marginTop:16, fontSize:11, color:'rgba(255,255,255,0.25)' }}>
-            Built for researchers at DIU, BUET, DU, BRAC University and beyond.<br />
+            Built for researchers, faculty, and institutions worldwide —
+            universities, labs, NGOs, government bodies, and beyond.<br />
             Developed by Tariqul Islam · Faculty of Graduate Studies, DIU
           </div>
         </div>
@@ -189,12 +190,47 @@ export default function Login() {
           </Link>
         </div>
 
-        <div className="login-footer-text" style={{ marginTop:24, fontSize:11, lineHeight:1.9 }}>
+        <div className="login-footer-text" style={{ marginTop:24, fontSize:11 }}>
           🔒 Authorized users only. All access is logged and monitored.<br />
-          ResearchTrack is a private research expense management platform.<br />
-          <span style={{ color:'rgba(255,255,255,0.22)' }}>
-            Built by Tariqul Islam · Faculty of Graduate Studies, DIU · © 2025
-          </span>
+          <span style={{ color:'rgba(255,255,255,0.30)' }}>ResearchTrack · Built by Tariqul Islam · © 2025</span>
+        </div>
+
+        {/* ── Footer links with real inline content ── */}
+        <div style={{ marginTop:16, display:'flex', flexWrap:'wrap', gap:'4px 16px', justifyContent:'center' }}>
+          {[
+            {
+              label:'About',
+              content: 'ResearchTrack is a private research expense management platform built for academic researchers worldwide. It lets you manage project budgets, track expenses, handle reimbursements, and generate professional financial reports — completely isolated from your institution.',
+            },
+            {
+              label:'How it works',
+              content: '1. Request access or get invited by your workspace admin.\n2. Your admin creates a workspace and adds your team.\n3. Create research projects with budgets and funding installments.\n4. Team members submit expenses; admins approve or reject them.\n5. Generate PDF or Excel reports for your funding body anytime.',
+            },
+            {
+              label:'Who needs it',
+              content: 'ResearchTrack is for Principal Investigators (PIs), co-investigators, research fellows, PhD students, and project coordinators managing funded research at universities, government labs, NGOs, and independent research institutes — anywhere in the world.',
+            },
+            {
+              label:'Privacy',
+              content: 'Your workspace is completely isolated. No other user, admin, or institution can see your data. All data is encrypted in transit via HTTPS. We never sell data or show ads. Financial details are never visible to the platform superadmin.',
+            },
+          ].map(({ label, content }) => (
+            <button key={label}
+              onClick={() => {
+                const text = content.replace(/\\n/g, '\n');
+                alert(`${label}\n\n${text}`);
+              }}
+              style={{
+                background:'none', border:'none', cursor:'pointer',
+                fontSize:11, color:'rgba(255,255,255,0.35)',
+                textDecoration:'underline', textDecorationColor:'rgba(255,255,255,0.15)',
+                padding:0, fontFamily:'inherit',
+                transition:'color 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.color='rgba(255,255,255,0.65)'}
+              onMouseLeave={e => e.currentTarget.style.color='rgba(255,255,255,0.35)'}
+            >{label}</button>
+          ))}
         </div>
       </div>
     </div>
