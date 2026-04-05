@@ -77,24 +77,17 @@ export default function Dashboard() {
     return 0;
   });
 
-  // Archive rule: show active + on_hold always.
-  // Completed projects: show only those completed within the last 6 months.
-  // Older completed projects go to Archive automatically.
-  const SIX_MONTHS_AGO = new Date();
-  SIX_MONTHS_AGO.setMonth(SIX_MONTHS_AGO.getMonth() - 6);
-
+  // Archive rule: show active + on_hold always, last 5 completed only
+  // Admin can manually archive any project
   const completed = filtered.filter(p => p.status === 'completed');
   const others    = filtered.filter(p => p.status !== 'completed');
-  // Show completed only if updated/created within 6 months
-  const recentCompleted = completed.filter(p =>
-    new Date(p.updated_at || p.created_at) >= SIX_MONTHS_AGO
-  );
-  const archivedCompleted = completed.filter(p =>
-    new Date(p.updated_at || p.created_at) < SIX_MONTHS_AGO
-  );
+  // Show last 5 completed by date
+  const recentCompleted = completed
+    .sort((a,b) => new Date(b.created_at)-new Date(a.created_at))
+    .slice(0,5);
   filtered = [...others, ...recentCompleted]
     .sort((a,b) => new Date(b.created_at)-new Date(a.created_at));
-  const hiddenCount = archivedCompleted.length;
+  const hiddenCount = completed.length - recentCompleted.length;
 
   if (loading) return (
     <div className="loading-screen">
@@ -265,19 +258,17 @@ export default function Dashboard() {
                           {p.status === 'completed' ? 'Ended' : p.status}
                         </span>
                         {isAdmin && (
-                          <>
-                            <button
-                              className="btn btn-ghost btn-xs no-print"
-                              style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
-                              onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
-                            >✏</button>
-                            <button
-                              className="btn btn-ghost btn-xs no-print"
-                              style={{ fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
-                              disabled={archiving===p.id}
-                              onClick={e => handleArchive(p.id, p.name, e)}
-                            >{archiving===p.id?'…':'📦'}</button>
-                          </>
+                          <button
+                            className="btn btn-ghost btn-xs no-print"
+                            style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
+                          >✏</button>
+                          <button
+                            className="btn btn-ghost btn-xs no-print"
+                            style={{ fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
+                            disabled={archiving===p.id}
+                            onClick={e => handleArchive(p.id, p.name, e)}
+                          >{archiving===p.id?'…':'📦'}</button>
                         )}
                       </div>
                     </div>
