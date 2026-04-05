@@ -257,18 +257,21 @@ export default function Dashboard() {
                           {p.status === 'completed' ? 'Ended' : p.status}
                         </span>
                         {isAdmin && (
-                          <button
-                            className="btn btn-ghost btn-xs no-print"
-                            style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
-                            onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
-                          >✏</button>
-                          <button
-                            className="btn btn-ghost btn-xs no-print"
-                            style={{ fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
-                            disabled={archiving===p.id}
-                            onClick={e => handleArchive(p.id, p.name, e)}
-                          >{archiving===p.id?'…':'📦'}</button>
-                        )}
+  <>
+    <button
+      className="btn btn-ghost btn-xs no-print"
+      style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
+      onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
+    >✏</button>
+
+    <button
+      className="btn btn-ghost btn-xs no-print"
+      style={{ fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
+      disabled={archiving===p.id}
+      onClick={e => handleArchive(p.id, p.name, e)}
+    >{archiving===p.id?'…':'📦'}</button>
+  </>
+)}
                       </div>
                     </div>
                     <div className="project-title">{p.name}</div>
