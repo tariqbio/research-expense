@@ -644,7 +644,7 @@ export default function SuperAdmin() {
                           Created {fmtDate(drillData.workspace.created_at)}
                         </div>
                       </div>
-                      <div style={{ display:'flex', gap:6' }}>
+                      <div style={{ display:'flex', gap:6 }}>
                         <span style={{ fontSize:11, color:'var(--text-tertiary)',
                                               fontStyle:'italic' }}>
                           Read-only view
