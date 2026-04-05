@@ -77,17 +77,16 @@ export default function Dashboard() {
     return 0;
   });
 
-  // Archive rule: show active + on_hold always, last 5 completed only
-  // Admin can manually archive any project
-  const completed = filtered.filter(p => p.status === 'completed');
-  const others    = filtered.filter(p => p.status !== 'completed');
-  // Show last 5 completed by date
-  const recentCompleted = completed
-    .sort((a,b) => new Date(b.created_at)-new Date(a.created_at))
-    .slice(0,5);
+  // Archive rule: active + on_hold always show
+  // Completed projects from last 6 months show, older ones auto-archived
+  const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
+  const completed    = filtered.filter(p => p.status === 'completed');
+  const others       = filtered.filter(p => p.status !== 'completed');
+  const recentCompleted = completed.filter(p => new Date(p.created_at) >= sixMonthsAgo);
+  const oldCompleted    = completed.filter(p => new Date(p.created_at) <  sixMonthsAgo);
+  const hiddenCount = oldCompleted.length;
   filtered = [...others, ...recentCompleted]
     .sort((a,b) => new Date(b.created_at)-new Date(a.created_at));
-  const hiddenCount = completed.length - recentCompleted.length;
 
   if (loading) return (
     <div className="loading-screen">

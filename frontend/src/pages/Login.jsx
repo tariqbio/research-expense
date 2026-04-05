@@ -49,7 +49,7 @@ export default function Login() {
             {[
               { icon:'🔒', title:'Completely private', desc:'Your workspace is isolated. No university, no department, no one else can access your data.' },
               { icon:'💰', title:'Full budget tracking', desc:'Fund installments, expense categories, reimbursement status — all in one place.' },
-              { icon:'📊', title:'One-click reports', desc:'Generate PDF and Excel reports for your PI, university, or funding body instantly.' },
+              { icon:'📊', title:'One-click reports', desc:'Generate PDF and Excel reports for your Principal Investigator (PI), university, or funding body instantly.' },
               { icon:'👥', title:'Team collaboration', desc:'Add researchers, assign them to projects. Each person sees only what they need.' },
             ].map((f,i) => (
               <div key={i} className="hero-feature">
@@ -191,8 +191,12 @@ export default function Login() {
 
         <div className="login-footer-text" style={{ marginTop:24, fontSize:11 }}>
           🔒 Authorized users only. All access is logged and monitored.<br />
-          By signing in you agree to our Terms of Service and Privacy Policy.<br />
-          ResearchTrack · Built by Tariqul Islam · © 2025
+          By signing in you agree to our{' '}
+          <a href="/terms" style={{ color:'rgba(255,255,255,0.45)' }}>Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy" style={{ color:'rgba(255,255,255,0.45)' }}>Privacy Policy</a>.<br />
+          ResearchTrack · Built by Tariqul Islam · © 2025 ·{' '}
+          <a href="/contact" style={{ color:'rgba(255,255,255,0.45)' }}>Contact</a>
         </div>
       </div>
     </div>

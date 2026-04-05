@@ -110,16 +110,7 @@ export default function SuperAdmin() {
     finally { setRejecting(null); }
   };
 
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Delete workspace "${name}" permanently?\n\nAll users, projects, and expenses will be removed.`)) return;
-    setDeleting(id);
-    try {
-      await api.delete(`/super/workspaces/${id}`);
-      setWorkspaces(ws=>ws.filter(w=>w.id!==id));
-      if (drillId===id) { setDrillId(null); setDrillData(null); }
-    } catch(e) { alert('Failed'); }
-    finally { setDeleting(null); }
-  };
+
 
   const compressAvatar = file => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -654,11 +645,10 @@ export default function SuperAdmin() {
                         </div>
                       </div>
                       <div style={{ display:'flex', gap:6' }}>
-                        <button className="btn btn-danger btn-sm"
-                          disabled={deleting===drillId}
-                          onClick={() => handleDelete(drillId, drillData.workspace.name)}>
-                          {deleting===drillId ? '…' : '🗑 Delete'}
-                        </button>
+                        <span style={{ fontSize:11, color:'var(--text-tertiary)',
+                                              fontStyle:'italic' }}>
+                          Read-only view
+                        </span>
                         <button className="btn btn-ghost btn-sm"
                           onClick={() => { setDrillId(null); setDrillData(null); }}>
                           ✕

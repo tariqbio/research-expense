@@ -1,3 +1,6 @@
+// Superadmin routes — READ ONLY platform oversight
+// Superadmin CANNOT: delete, modify, or access any workspace's data
+// Superadmin CAN: view platform stats, approve/reject access requests, monitor health
 const router = require('express').Router();
 const pool   = require('../db/pool');
 const { authenticate, superOnly } = require('../middleware/auth');
@@ -7,50 +10,56 @@ router.get('/stats', authenticate, superOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        (SELECT COUNT(*) FROM workspaces)                                         AS total_workspaces,
-        (SELECT COUNT(*) FROM users WHERE role = 'admin')                        AS total_admins,
-        (SELECT COUNT(*) FROM users WHERE role = 'member')                       AS total_members,
-        (SELECT COUNT(*) FROM projects WHERE archived = FALSE)                   AS active_projects,
-        (SELECT COUNT(*) FROM projects)                                          AS total_projects,
-        (SELECT COUNT(*) FROM expenses)                                          AS total_expenses,
+        (SELECT COUNT(*) FROM workspaces)                                          AS total_workspaces,
+        (SELECT COUNT(*) FROM users WHERE role = 'admin')                         AS total_admins,
+        (SELECT COUNT(*) FROM users WHERE role = 'member')                        AS total_members,
+        (SELECT COUNT(*) FROM projects WHERE archived = FALSE)                    AS active_projects,
+        (SELECT COUNT(*) FROM projects)                                           AS total_projects,
+        (SELECT COUNT(*) FROM expenses)                                           AS total_expenses,
         (SELECT COUNT(*) FROM workspaces
-         WHERE id IN (SELECT workspace_id FROM projects WHERE archived=FALSE GROUP BY workspace_id))
-                                                                                 AS workspaces_with_projects,
+         WHERE id IN (
+           SELECT workspace_id FROM projects WHERE workspace_id IS NOT NULL
+         ))                                                                       AS workspaces_with_projects,
         (SELECT COUNT(*) FROM workspaces
-         WHERE id NOT IN (SELECT DISTINCT workspace_id FROM projects WHERE workspace_id IS NOT NULL))
-                                                                                 AS ghost_workspaces,
+         WHERE id NOT IN (
+           SELECT DISTINCT workspace_id FROM projects WHERE workspace_id IS NOT NULL
+         ))                                                                       AS ghost_workspaces,
         (SELECT COUNT(*) FROM users
-         WHERE last_active > NOW() - INTERVAL '7 days' AND role != 'superadmin') AS active_users_7d,
+         WHERE last_active > NOW() - INTERVAL '7 days'
+           AND role != 'superadmin')                                              AS active_users_7d,
         (SELECT COUNT(*) FROM workspaces
          WHERE created_at > NOW() - INTERVAL '30 days')                          AS new_workspaces_30d,
         (SELECT COUNT(*) FROM workspaces
-         WHERE last_active > NOW() - INTERVAL '7 days' OR
-               id IN (SELECT DISTINCT workspace_id FROM users
-                      WHERE last_active > NOW() - INTERVAL '7 days'))            AS active_workspaces_7d
+         WHERE id IN (
+           SELECT DISTINCT workspace_id FROM users
+           WHERE last_active > NOW() - INTERVAL '7 days'
+             AND role != 'superadmin'
+         ))                                                                       AS active_workspaces_7d
     `);
     res.json(rows[0]);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// GET /api/super/workspaces — full list with admin contact info
+// GET /api/super/workspaces
 router.get('/workspaces', authenticate, superOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
         w.id, w.name, w.report_header, w.created_at,
-        -- Admin info (first admin found)
-        (SELECT u.name  FROM users u WHERE u.workspace_id=w.id AND u.role='admin' ORDER BY u.created_at LIMIT 1) AS admin_name,
-        (SELECT u.email FROM users u WHERE u.workspace_id=w.id AND u.role='admin' ORDER BY u.created_at LIMIT 1) AS admin_email,
-        (SELECT u.institution FROM users u WHERE u.workspace_id=w.id AND u.role='admin' ORDER BY u.created_at LIMIT 1) AS admin_institution,
-        (SELECT u.role_in_project FROM users u WHERE u.workspace_id=w.id AND u.role='admin' ORDER BY u.created_at LIMIT 1) AS admin_role_in_project,
-        -- Counts
-        COUNT(DISTINCT u.id) FILTER (WHERE u.role='admin')  AS admin_count,
-        COUNT(DISTINCT u.id) FILTER (WHERE u.role='member') AS member_count,
+        (SELECT u.name  FROM users u WHERE u.workspace_id=w.id AND u.role='admin'
+         ORDER BY u.created_at LIMIT 1)  AS admin_name,
+        (SELECT u.email FROM users u WHERE u.workspace_id=w.id AND u.role='admin'
+         ORDER BY u.created_at LIMIT 1)  AS admin_email,
+        (SELECT u.institution FROM users u WHERE u.workspace_id=w.id AND u.role='admin'
+         ORDER BY u.created_at LIMIT 1)  AS admin_institution,
+        (SELECT u.role_in_project FROM users u WHERE u.workspace_id=w.id AND u.role='admin'
+         ORDER BY u.created_at LIMIT 1)  AS admin_role,
+        COUNT(DISTINCT u.id) FILTER (WHERE u.role='admin')   AS admin_count,
+        COUNT(DISTINCT u.id) FILTER (WHERE u.role='member')  AS member_count,
         COUNT(DISTINCT p.id) FILTER (WHERE p.archived=FALSE) AS active_project_count,
         COUNT(DISTINCT p.id)                                  AS total_project_count,
         COUNT(DISTINCT e.id)                                  AS expense_count,
-        -- Activity
-        MAX(u.last_active) AS last_active
+        MAX(u.last_active)                                    AS last_active
       FROM workspaces w
       LEFT JOIN users    u ON u.workspace_id = w.id
       LEFT JOIN projects p ON p.workspace_id = w.id
@@ -62,7 +71,7 @@ router.get('/workspaces', authenticate, superOnly, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// GET /api/super/workspaces/:id — workspace detail with team list
+// GET /api/super/workspaces/:id — workspace overview (no financial data)
 router.get('/workspaces/:id', authenticate, superOnly, async (req, res) => {
   try {
     const { rows: ws } = await pool.query('SELECT * FROM workspaces WHERE id=$1', [req.params.id]);
@@ -76,7 +85,7 @@ router.get('/workspaces/:id', authenticate, superOnly, async (req, res) => {
     );
 
     const { rows: projects } = await pool.query(
-      `SELECT id, code, name, status, archived, total_budget, created_at
+      `SELECT id, code, name, status, archived, created_at
        FROM projects WHERE workspace_id=$1 ORDER BY created_at DESC LIMIT 10`,
       [req.params.id]
     );
@@ -85,29 +94,23 @@ router.get('/workspaces/:id', authenticate, superOnly, async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// GET /api/super/growth — monthly new workspace registrations (last 12 months)
+// GET /api/super/growth
 router.get('/growth', authenticate, superOnly, async (req, res) => {
   try {
     const { rows } = await pool.query(`
       SELECT
-        TO_CHAR(created_at, 'Mon YY') AS month,
+        TO_CHAR(DATE_TRUNC('month', created_at), 'Mon YY') AS month,
         COUNT(*) AS count
       FROM workspaces
       WHERE created_at > NOW() - INTERVAL '12 months'
-      GROUP BY DATE_TRUNC('month', created_at), TO_CHAR(created_at, 'Mon YY')
+      GROUP BY DATE_TRUNC('month', created_at)
       ORDER BY DATE_TRUNC('month', created_at)
     `);
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// DELETE /api/super/workspaces/:id
-router.delete('/workspaces/:id', authenticate, superOnly, async (req, res) => {
-  try {
-    const { rows } = await pool.query('DELETE FROM workspaces WHERE id=$1 RETURNING name', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: 'Not found' });
-    res.json({ message: `Workspace "${rows[0].name}" deleted` });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
-});
+// NOTE: No DELETE route. Workspaces are private property.
+// Superadmin can only approve or reject new signups.
 
 module.exports = router;

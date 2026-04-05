@@ -11,10 +11,16 @@ const PROJECT_NATURES = [
   'Academic Research', 'Applied Research', 'Development Project',
   'Consultancy', 'Community Outreach', 'Other',
 ];
+// PI = Principal Investigator: the lead researcher who holds the grant
 const ROLES = [
-  'Principal Investigator (PI)', 'Co-Principal Investigator (Co-PI)',
-  'Research Fellow', 'Project Coordinator', 'Research Manager',
-  'Research Assistant', 'Other',
+  'Principal Investigator (PI) — Lead researcher holding the grant',
+  'Co-PI — Co-investigator sharing grant responsibility',
+  'Research Fellow — Senior researcher working under PI',
+  'Project Coordinator / Manager — Handles operations and finances',
+  'Research Assistant — Junior researcher or data collector',
+  'PhD Researcher — Doctoral student on the project',
+  'Industry / NGO Partner',
+  'Other',
 ];
 
 export default function RequestAccess() {
@@ -156,15 +162,20 @@ export default function RequestAccess() {
             </div>
             <div className="form-group">
               <label className="form-label">Your Role in the Project <span className="form-required">*</span></label>
+              <div className="form-hint" style={{ marginBottom:6 }}>
+                PI (Principal Investigator) = the lead researcher who holds and is responsible for the grant funding.
+              </div>
               <select className="form-select" value={form.role_in_project} onChange={set('role_in_project')} required>
-                <option value="">Select your role…</option>
+                <option value="">Select your role in this project…</option>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Position / Designation</label>
-              <input className="form-input" placeholder="e.g. Associate Professor, PhD Researcher"
+              <label className="form-label">Academic / Professional Title</label>
+              <input className="form-input"
+                placeholder="e.g. Professor, Associate Professor, PhD Candidate, Senior Engineer"
                 value={form.position} onChange={set('position')} />
+              <div className="form-hint">Your job title or academic rank at your institution.</div>
             </div>
             <div className="form-group">
               <label className="form-label">Email Address <span className="form-required">*</span></label>
