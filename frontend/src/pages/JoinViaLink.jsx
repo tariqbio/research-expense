@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import api from '../api';
+import axios from 'axios';
+
+// Public axios instance — no Bearer token attached.
+// The join endpoint is public and must NOT receive an existing user's auth token,
+// because that would confuse the backend and can cause 401 → forced logout.
+const publicApi = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } });
 
 function CountdownTimer({ expiresAt }) {
   const [left, setLeft] = useState('');
@@ -36,11 +41,14 @@ export default function JoinViaLink() {
 
   useEffect(() => {
     if (!token) { setStatus('error'); setErrorMsg('No invite token found in this link. Please ask for a new one.'); return; }
-    api.get(`/auth/join?token=${token}`)
+    publicApi.get(`/auth/join?token=${token}`)
       .then(r => { setInvite(r.data); setStatus('valid'); })
       .catch(e => {
+        // Log out the current session if the interceptor triggered a redirect
+        // — but we're on a public page so just show the error gracefully.
+        const msg = e.response?.data?.error;
         setStatus('error');
-        setErrorMsg(e.response?.data?.error || 'This invite link is invalid or has expired.');
+        setErrorMsg(msg || 'This invite link is invalid or has expired. Please ask your admin for a new one.');
       });
   }, [token]);
 
@@ -51,7 +59,7 @@ export default function JoinViaLink() {
     if (form.password !== form.confirm) return setFormError('Passwords do not match.');
     setSaving(true);
     try {
-      const { data } = await api.post('/auth/join', {
+      const { data } = await publicApi.post('/auth/join', {
         token, name: form.name.trim(),
         password: form.password,
         position: form.position.trim(),

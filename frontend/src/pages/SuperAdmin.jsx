@@ -230,11 +230,13 @@ export default function SuperAdmin() {
         boxShadow: dark?'0 1px 12px rgba(0,0,0,0.3)':'0 1px 6px rgba(0,0,0,0.06)',
       }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <div style={{ width:30, height:30, borderRadius:8,
-                        background:'linear-gradient(135deg,#7c3aed,#4f46e5)',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:14, fontWeight:800, color:'#fff' }}>R</div>
-          <span style={{ fontWeight:700, fontSize:14, color:'var(--text-primary)' }}>ResearchTrack</span>
+          <a href="/" style={{ display:'flex', alignItems:'center', gap:8, textDecoration:'none' }}>
+            <div style={{ width:30, height:30, borderRadius:8,
+                          background:'linear-gradient(135deg,#7c3aed,#4f46e5)',
+                          display:'flex', alignItems:'center', justifyContent:'center',
+                          fontSize:14, fontWeight:800, color:'#fff' }}>R</div>
+            <span style={{ fontWeight:700, fontSize:14, color:'var(--text-primary)' }}>ResearchTrack</span>
+          </a>
           <span style={{ fontSize:11, padding:'2px 8px', borderRadius:20, fontWeight:600,
                          background:'rgba(124,58,237,0.12)', color:'#7c3aed',
                          border:'1px solid rgba(124,58,237,0.25)' }}>Super Admin</span>

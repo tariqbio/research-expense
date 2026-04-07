@@ -261,7 +261,7 @@ export function exportProjectXlsx({ project, expenses, stats, getCatLabel, fmtDa
   <table style="width:100%;margin-top:20px;border-top:1px solid #e5e7eb">
     <tr>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0">
-        ResearchTrack v2.0 &nbsp;·&nbsp; ${orgName}
+        ResearchTrack · ${orgName}
       </td>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0;text-align:right">
         Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 ${orgShort}
@@ -378,7 +378,7 @@ export function exportExpensesXlsx({ displayed, totals, filters, projects, searc
   <table style="width:100%;margin-top:20px;border-top:1px solid #e5e7eb">
     <tr>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0">
-        ResearchTrack v2.0 &nbsp;·&nbsp; ${orgName}
+        ResearchTrack · ${orgName}
       </td>
       <td style="font-size:7.5pt;color:#aaa;padding:6px 0;text-align:right">
         Developed by Tariqul Islam &nbsp;·&nbsp; © 2025 ${orgShort}

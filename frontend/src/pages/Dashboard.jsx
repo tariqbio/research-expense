@@ -47,12 +47,18 @@ export default function Dashboard() {
   };
   useEffect(() => { load(); }, []);
 
-  const totals = summary.reduce((a, p) => ({
-    budget:     a.budget     + Number(p.total_budget),
-    spent:      a.spent      + Number(p.total_spent),
-    reimbursed: a.reimbursed + Number(p.reimbursed),
-    pending:    a.pending    + Number(p.pending),
-  }), { budget:0, spent:0, reimbursed:0, pending:0 });
+  // Only active / on_hold projects feed the header stats —
+  // completed projects are excluded so finishing a project reduces the totals.
+  const activeIds = new Set(projects.filter(p => p.status !== 'completed').map(p => p.id));
+  const totals = summary.reduce((a, p) => {
+    if (!activeIds.has(p.project_id)) return a;
+    return {
+      budget:     a.budget     + Number(p.total_budget),
+      spent:      a.spent      + Number(p.total_spent),
+      reimbursed: a.reimbursed + Number(p.reimbursed),
+      pending:    a.pending    + Number(p.pending),
+    };
+  }, { budget:0, spent:0, reimbursed:0, pending:0 });
 
   const pct = totals.budget > 0 ? Math.min(100, (totals.spent / totals.budget) * 100) : 0;
 
@@ -123,7 +129,7 @@ export default function Dashboard() {
               </div>
               <div className="stat-icon si-indigo">💰</div>
             </div>
-            <div className="stat-note">{projects.length} Project{projects.length !== 1 ? 's' : ''} Total</div>
+            <div className="stat-note">{projects.filter(p=>p.status!=='completed').length} Active Project{projects.filter(p=>p.status!=='completed').length !== 1 ? 's' : ''}</div>
           </div>
 
           <div className="stat-card">
