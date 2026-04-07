@@ -5,7 +5,6 @@ import { useEffect, useState } from 'react';
 const NAV = [
   { to:'/',         label:'Dashboard',   icon:'📊', end:true },
   { to:'/expenses', label:'Expenses',    icon:'🧾' },
-  { to:'/archive',  label:'Archive',     icon:'🗂️' },
   { to:'/profile',  label:'My Profile',  icon:'👤' },
 ];
 const ADMIN_NAV = [
@@ -49,13 +48,13 @@ export default function Layout() {
       <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}
 >
         <div className="sidebar-header">
-          <Link to="/" className="sidebar-brand" style={{ textDecoration:'none' }}>
+          <div className="sidebar-brand">
             <div className="sidebar-logo">R</div>
             <div>
               <div className="sidebar-app-name">ResearchTrack</div>
               <div className="sidebar-app-sub">Expense Management</div>
             </div>
-          </Link>
+          </div>
           {workspaceName && (
             <div className="sidebar-university">
               <div className="sidebar-uni-name">{workspaceName}</div>
@@ -121,21 +120,13 @@ export default function Layout() {
 
         <div className="sidebar-footer">
           Developed by Tariqul Islam<br />
-          ResearchTrack · 2025
+          ResearchTrack v10 · 2025
         </div>
       </aside>
 
       <div className="main-wrapper">
         <header className="topbar">
           <button className="hamburger-btn" onClick={() => setSidebarOpen(s=>!s)}>☰</button>
-          <Link to="/" style={{ display:'flex', alignItems:'center', textDecoration:'none', flexShrink:0 }}>
-            <div style={{
-              width:28, height:28, borderRadius:8,
-              background:'var(--accent)', color:'#0d1f17',
-              display:'flex', alignItems:'center', justifyContent:'center',
-              fontWeight:800, fontSize:14, flexShrink:0,
-            }}>R</div>
-          </Link>
           <div className="topbar-breadcrumb">
             <span>{crumbs[0]}</span><span className="topbar-sep">›</span>
             <span className="current">{crumbs[1]}</span>
@@ -167,7 +158,7 @@ export default function Layout() {
             </div>
           </div>
           <div className="footer-right">
-            ResearchTrack · Developed by Tariqul Islam<br />
+            ResearchTrack v10 · Developed by Tariqul Islam<br />
             © 2025 · All access is logged and audited
           </div>
         </footer>

@@ -273,15 +273,13 @@ body {
 
 .stat-card {
   background: rgba(255,255,255,0.65);
-  border: 1px solid rgba(255,255,255,0.95);
+  border: 1px solid rgba(255,255,255,0.80);
   box-shadow:
     0 0 0 1px rgba(0,0,0,0.06),
-    0 4px 16px rgba(0,0,0,0.08),
-    0 16px 32px rgba(0,0,0,0.05),
-    inset 0 1px 0 rgba(255,255,255,1.0);
-  backdrop-filter: blur(24px) saturate(200%);
-  -webkit-backdrop-filter: blur(24px) saturate(200%);
-  transition: box-shadow 0.2s, transform 0.2s;
+    0 4px 16px rgba(0,0,0,0.06),
+    inset 0 1px 0 rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border-radius: var(--r-lg); padding: 18px 20px;
   display: flex; flex-direction: column; gap: 2px;
@@ -290,12 +288,7 @@ body {
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.07),
-    0 8px 24px rgba(0,0,0,0.12),
-    0 20px 40px rgba(0,0,0,0.06),
-    inset 0 1px 0 rgba(255,255,255,1.0);
-  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.90);
   border-color: rgba(40,233,140,0.40);
 }
 
@@ -365,26 +358,15 @@ body {
    CARDS
 ───────────────────────────────────────────────────────── */
 .card {
-  background: rgba(255,255,255,0.88);
-  border: 1px solid rgba(255,255,255,0.95);
+  background: rgba(255,255,255,0.72);
+  border: 1px solid rgba(255,255,255,0.85);
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.07),
-    0 2px 4px rgba(0,0,0,0.04),
-    0 8px 24px rgba(0,0,0,0.08),
-    0 24px 48px rgba(0,0,0,0.04),
-    inset 0 1px 0 rgba(255,255,255,1.0);
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
+    0 0 0 1px rgba(0,0,0,0.06),
+    0 4px 24px rgba(0,0,0,0.07),
+    inset 0 1px 0 rgba(255,255,255,0.90);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border-radius: var(--r-lg);
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-.card:hover {
-  box-shadow:
-    0 0 0 1px rgba(0,0,0,0.07),
-    0 4px 8px rgba(0,0,0,0.06),
-    0 16px 40px rgba(0,0,0,0.10),
-    0 32px 64px rgba(0,0,0,0.05),
-    inset 0 1px 0 rgba(255,255,255,1.0);
 }
 /* overflow:hidden removed — it clips dropdown menus inside table rows */
 /* Apply clipping only to children that need it (table scroll, card headers) */
@@ -394,23 +376,14 @@ body {
 .card > .filter-bar { border-radius: 0; }
 
 [data-theme="dark"] .card {
-  background: rgba(30,32,30,0.92);
-  border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(28,30,26,0.78);
+  border: 1px solid rgba(255,255,255,0.12);
   box-shadow:
-    0 0 0 1px rgba(255,255,255,0.05),
-    0 2px 4px rgba(0,0,0,0.20),
-    0 8px 32px rgba(0,0,0,0.50),
-    0 24px 56px rgba(0,0,0,0.30),
-    inset 0 1px 0 rgba(255,255,255,0.10);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-}
-[data-theme="dark"] .card:hover {
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,0.06),
-    0 4px 8px rgba(0,0,0,0.25),
-    0 16px 48px rgba(0,0,0,0.55),
-    inset 0 1px 0 rgba(255,255,255,0.12);
+    0 0 0 1px rgba(255,255,255,0.04),
+    0 4px 32px rgba(0,0,0,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
 }
 
 .card-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -864,38 +837,6 @@ input[type="date"].form-input::-webkit-calendar-picker-indicator { opacity: 0.6;
   z-index: 1;
   border-radius: 20px;
   border: 1px solid rgba(255,255,255,0.12);
-}
-
-
-/* ── Mobile login fix ──────────────────────────────────── */
-@media (max-width: 640px) {
-  .login-page {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-  .login-hero {
-    display: none !important;
-  }
-  .login-panel {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-height: 100vh;
-    border-radius: 0 !important;
-    padding: 32px 24px !important;
-    position: relative !important;
-  }
-  .login-page--centered .login-panel {
-    border-radius: 0 !important;
-  }
-  .mobile-login-hero-strip {
-    display: block !important;
-  }
-}
-@media (min-width: 641px) {
-  .mobile-login-hero-strip {
-    display: none !important;
-  }
 }
 
 /* ─────────────────────────────────────────────────────────

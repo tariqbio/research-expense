@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import axios from 'axios';
-
-// Public axios — no Bearer token, same reason as JoinViaLink
-const publicApi = axios.create({ baseURL: '/api', headers: { 'Content-Type': 'application/json' } });
+import api from '../api';
 
 export default function JoinViaCode() {
   const { code }   = useParams();
@@ -16,7 +13,7 @@ export default function JoinViaCode() {
 
   useEffect(() => {
     if (!code) { setError('No code provided.'); setLoading(false); return; }
-    publicApi.get(`/auth/code/${code}`)
+    api.get(`/auth/code/${code}`)
       .then(r => setInfo(r.data))
       .catch(e => setError(e.response?.data?.error || 'Invalid or expired code.'))
       .finally(() => setLoading(false));
@@ -27,7 +24,7 @@ export default function JoinViaCode() {
     if (form.password !== form.confirm) return setError('Passwords do not match.');
     setSaving(true);
     try {
-      const { data } = await publicApi.post(`/auth/code/${code}`, form);
+      const { data } = await api.post(`/auth/code/${code}`, form);
       localStorage.setItem('rt_token', data.token);
       localStorage.setItem('rt_user',  JSON.stringify(data.user));
       navigate('/');

@@ -387,7 +387,7 @@ ${project.installments.length > 0 ? `
 
 <!-- FOOTER -->
 <div class="report-footer">
-  <span>ResearchTrack · Faculty of Graduate Studies, Daffodil International University</span>
+  <span>ResearchTrack v2.0 &nbsp;·&nbsp; Faculty of Graduate Studies, Daffodil International University</span>
   <span>Developed by Tariqul Islam &nbsp;·&nbsp; &copy; 2025 FGS, DIU</span>
 </div>
 

@@ -9,18 +9,6 @@ const getGreeting = () => { const h = new Date().getHours(); return h < 12 ? 'Go
 
 export default function Dashboard() {
   const { isAdmin, user } = useAuth();
-  const [archiving, setArchiving] = useState(null);
-
-  const handleArchive = async (id, name, e) => {
-    e.preventDefault(); e.stopPropagation();
-    if (!confirm(`Archive "${name}"? It will be hidden from the dashboard but not deleted.`)) return;
-    setArchiving(id);
-    try {
-      await api.patch(`/projects/${id}/archive`, { archived: true });
-      load();
-    } catch(err) { alert('Failed to archive'); }
-    finally { setArchiving(null); }
-  };
   const [projects, setProjects]   = useState([]);
   const [summary, setSummary]     = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -47,11 +35,10 @@ export default function Dashboard() {
   };
   useEffect(() => { load(); }, []);
 
-  // Only active / on_hold projects feed the header stats —
-  // completed projects are excluded so finishing a project reduces the totals.
-  const activeIds = new Set(projects.filter(p => p.status !== 'completed').map(p => p.id));
+  // Only sum money for ACTIVE projects — completed/on-hold stats are historical noise
+  const activeProjectIds = new Set(projects.filter(p => p.status === 'active').map(p => p.id));
   const totals = summary.reduce((a, p) => {
-    if (!activeIds.has(p.project_id)) return a;
+    if (!activeProjectIds.has(p.project_id)) return a;
     return {
       budget:     a.budget     + Number(p.total_budget),
       spent:      a.spent      + Number(p.total_spent),
@@ -83,17 +70,6 @@ export default function Dashboard() {
     return 0;
   });
 
-  // Archive rule: active + on_hold always show
-  // Completed projects from last 6 months show, older ones auto-archived
-  const sixMonthsAgo = new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000);
-  const completed    = filtered.filter(p => p.status === 'completed');
-  const others       = filtered.filter(p => p.status !== 'completed');
-  const recentCompleted = completed.filter(p => new Date(p.created_at) >= sixMonthsAgo);
-  const oldCompleted    = completed.filter(p => new Date(p.created_at) <  sixMonthsAgo);
-  const hiddenCount = oldCompleted.length;
-  filtered = [...others, ...recentCompleted]
-    .sort((a,b) => new Date(b.created_at)-new Date(a.created_at));
-
   if (loading) return (
     <div className="loading-screen">
       <div className="spinner" />
@@ -124,18 +100,18 @@ export default function Dashboard() {
           <div className="stat-card">
             <div className="stat-top">
               <div>
-                <div className="stat-label">Total Budget</div>
+                <div className="stat-label">Active Budget</div>
                 <div className="stat-value indigo">{fmt(totals.budget)}</div>
               </div>
               <div className="stat-icon si-indigo">💰</div>
             </div>
-            <div className="stat-note">{projects.filter(p=>p.status!=='completed').length} Active Project{projects.filter(p=>p.status!=='completed').length !== 1 ? 's' : ''}</div>
+            <div className="stat-note">{projects.length} Project{projects.length !== 1 ? 's' : ''} Total</div>
           </div>
 
           <div className="stat-card">
             <div className="stat-top">
               <div>
-                <div className="stat-label">Total Spent</div>
+                <div className="stat-label">Active Spent</div>
                 <div className="stat-value">{fmt(totals.spent)}</div>
               </div>
               <div className="stat-icon si-blue">📈</div>
@@ -143,7 +119,7 @@ export default function Dashboard() {
             <div className="progress">
               <div className={`progress-fill${pct > 90 ? ' danger' : pct > 70 ? ' warn' : ''}`} style={{ width: pct + '%' }} />
             </div>
-            <div className="stat-note">{pct.toFixed(1)}% Of Total Budget Utilised</div>
+            <div className="stat-note">{pct.toFixed(1)}% Of Active Budget Utilised</div>
           </div>
 
           <div className="stat-card">
@@ -228,18 +204,6 @@ export default function Dashboard() {
             <p>Try adjusting your search or filter.</p>
             <button className="btn btn-outline btn-sm" onClick={() => { setSearch(''); setStatusFilter(''); }}>Clear filters</button>
           </div>
-        ) : hiddenCount > 0 ? (
-          <div className="notice" style={{
-            background:'var(--bg-subtle)', border:'1px solid var(--border)',
-            borderRadius:8, padding:'10px 16px', fontSize:13,
-            color:'var(--text-secondary)', marginBottom:16,
-            display:'flex', justifyContent:'space-between', alignItems:'center',
-          }}>
-            <span>📦 {hiddenCount} older completed project{hiddenCount>1?'s':''} are in the archive</span>
-            <a href="/archive" style={{ color:'var(--accent)', fontSize:12, fontWeight:600, textDecoration:'none' }}>
-              View Archive →
-            </a>
-          </div>
         ) : projects.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🗂️</div>
@@ -263,21 +227,12 @@ export default function Dashboard() {
                           {p.status === 'completed' ? 'Ended' : p.status}
                         </span>
                         {isAdmin && (
-  <>
-    <button
-      className="btn btn-ghost btn-xs no-print"
-      style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
-      onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
-    >✏</button>
-
-    <button
-      className="btn btn-ghost btn-xs no-print"
-      style={{ fontSize: 11, padding: '2px 7px', lineHeight: 1.4 }}
-      disabled={archiving===p.id}
-      onClick={e => handleArchive(p.id, p.name, e)}
-    >{archiving===p.id?'…':'📦'}</button>
-  </>
-)}
+                          <button
+                            className="btn btn-ghost btn-xs no-print"
+                            style={{ color: 'var(--danger)', fontSize: 11, padding: '2px 7px', lineHeight: 1.4, borderColor: 'var(--danger)' }}
+                            onClick={e => { e.preventDefault(); e.stopPropagation(); setEditProject(p); setShowModal(true); }}
+                          >✏</button>
+                        )}
                       </div>
                     </div>
                     <div className="project-title">{p.name}</div>

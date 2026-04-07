@@ -16,12 +16,8 @@ import Members        from './pages/Members';
 import MemberProfile  from './pages/MemberProfile';
 import Invites        from './pages/Invites';
 import Profile        from './pages/Profile';
-import Archive        from './pages/Archive';
 import Settings       from './pages/Settings';
 import SuperAdmin     from './pages/SuperAdmin';
-import Terms          from './pages/Terms';
-import Privacy        from './pages/Privacy';
-import Contact        from './pages/Contact';
 import Layout         from './components/Layout';
 import './styles.css';
 
@@ -68,9 +64,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
             <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
             <Route path="/reset-password"  element={<ResetPassword />} />
             <Route path="/verify-email"    element={<VerifyEmail />} />
-          <Route path="/terms"           element={<Terms />} />
-          <Route path="/privacy"         element={<Privacy />} />
-          <Route path="/contact"         element={<Contact />} />
             <Route path="/join"            element={<JoinViaLink />} />
             <Route path="/code/:code"      element={<JoinViaCode />} />
 
@@ -83,7 +76,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <Route path="projects/:id" element={<ProjectDetail />} />
               <Route path="expenses"     element={<Expenses />} />
               <Route path="profile"      element={<Profile />} />
-            <Route path="archive"      element={<Archive />} />
               <Route path="members"      element={<ProtectedRoute adminOnly><Members /></ProtectedRoute>} />
               <Route path="members/:id"  element={<ProtectedRoute adminOnly><MemberProfile /></ProtectedRoute>} />
               <Route path="invites"      element={<ProtectedRoute adminOnly><Invites /></ProtectedRoute>} />
